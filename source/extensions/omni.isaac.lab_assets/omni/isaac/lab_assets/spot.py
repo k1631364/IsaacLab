@@ -4,12 +4,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 
-"""Configuration for the Boston Dynamics robot.
+"""Configuration for the Boston Dynamics Spot robot."""
 
-The following configuration parameters are available:
-
-* :obj:`SPOT_CFG`: The Spot robot with delay PD and remote PD actuators.
-"""
+from __future__ import annotations
 
 import torch
 
@@ -122,10 +119,8 @@ joint_parameter_lookup = torch.tensor([
     [-0.272558, -22.528547, 33.792821],
     [-0.247100, -20.401667, 30.602500],
 ])
-"""The lookup table for the knee joint parameters of the Boston Dynamics Spot robot.
-
-This table describes the relationship between the joint angle (rad), the transmission ratio (in/out),
-and the output torque (N*m). It is used to interpolate the output torque based on the joint angle.
+"""Describes relationship between the joint angle (rad), the transmission ratio (in/out), and the output torque (N*m)
+for the knees of the Boston Dynamics Spot robot.
 """
 
 ##
@@ -167,17 +162,17 @@ SPOT_CFG = ArticulationCfg(
             effort_limit=45.0,
             stiffness=60.0,
             damping=1.5,
-            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
-            max_delay=4,  # physics time steps (max: 2.0*4=8.0ms)
+            min_num_time_lags=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_num_time_lags=4,  # physics time steps (max: 2.0*4=8.0ms)
         ),
         "spot_knee": RemotizedPDActuatorCfg(
             joint_names_expr=[".*_kn"],
             joint_parameter_lookup=joint_parameter_lookup,
-            effort_limit=None,  # torque limits are handled based experimental data (`RemotizedPDActuatorCfg.data`)
+            effort_limit=None,  # torque limits are handled based experimental data (:meth:`RemotizedPDActuatorCfg.data`)
             stiffness=60.0,
             damping=1.5,
-            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
-            max_delay=4,  # physics time steps (max: 2.0*4=8.0ms)
+            min_num_time_lags=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_num_time_lags=4,  # physics time steps (max: 2.0*4=8.0ms)
         ),
     },
 )

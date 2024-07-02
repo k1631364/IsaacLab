@@ -8,6 +8,11 @@ Script to train RL agent with skrl.
 
 Visit the skrl documentation (https://skrl.readthedocs.io) to see the examples structured in
 a more user-friendly way.
+
+# skrl in /workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/utils/wrappers/skrl.py
+# PPO in /workspace/isaaclab/_isaac_sim/kit/python/lib/python3.10/site-packages/skrl/agents/torch/ppo/ppo.py
+# PPO config for slider in /workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/direct/sliding/agents/skrl_ppo_cfg.yaml
+# To find pakcage location, find / -name "skrl" or find / -name "gymnasium"
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -29,18 +34,11 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
-parser.add_argument(
-    "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
-)
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
-
-if args_cli.video:
-    args_cli.enable_cameras = True
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
@@ -54,7 +52,6 @@ from datetime import datetime
 
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
 from skrl.memories.torch import RandomMemory
-from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
 
@@ -63,10 +60,12 @@ from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
-from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlVecEnvWrapper, process_skrl_cfg
+from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
 
 
+# Test comment (Working)
 def main():
+
     """Train with skrl agent."""
     # read the seed from command line
     args_cli_seed = args_cli.seed
@@ -90,11 +89,6 @@ def main():
     experiment_cfg["agent"]["experiment"]["experiment_name"] = log_dir
     # update log_dir
     log_dir = os.path.join(log_root_path, log_dir)
-
-    # multi-gpu training config
-    if args_cli.distributed:
-        # update env config device
-        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
 
     # max iterations for training
     if args_cli.max_iterations:
@@ -120,7 +114,7 @@ def main():
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
     # wrap around environment for skrl
-    env = SkrlVecEnvWrapper(env)  # same as: `wrap_env(env, wrapper="isaaclab")`
+    env = SkrlVecEnvWrapper(env)  # same as: `wrap_env(env, wrapper="isaac-orbit")`
 
     # set seed for the experiment (override from command line)
     set_seed(args_cli_seed if args_cli_seed is not None else experiment_cfg["seed"])
@@ -167,7 +161,6 @@ def main():
     agent_cfg = PPO_DEFAULT_CONFIG.copy()
     experiment_cfg["agent"]["rewards_shaper"] = None  # avoid 'dictionary changed size during iteration'
     agent_cfg.update(process_skrl_cfg(experiment_cfg["agent"]))
-
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
@@ -183,11 +176,14 @@ def main():
     # configure and instantiate a custom RL trainer for logging episode events
     # https://skrl.readthedocs.io/en/latest/api/trainers.html
     trainer_cfg = experiment_cfg["trainer"]
-    trainer_cfg["close_environment_at_exit"] = False
-    trainer = SequentialTrainer(cfg=trainer_cfg, env=env, agents=agent)
+    trainer = SkrlSequentialLogTrainer(cfg=trainer_cfg, env=env, agents=agent)
 
     # train the agent
     trainer.train()
+    
+    print(f"[INFO] Logging experiment in directory: {log_dir}")
+    checkpoint_path = os.path.join(log_dir, "checkpoints", "best_agent.pt")
+    print(f"Checkpoint: {checkpoint_path}")
 
     # close the simulator
     env.close()

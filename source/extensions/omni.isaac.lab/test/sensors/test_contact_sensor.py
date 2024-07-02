@@ -9,8 +9,10 @@
 
 from omni.isaac.lab.app import AppLauncher, run_tests
 
+HEADLESS = True
+
 # launch omniverse app
-app_launcher = AppLauncher(headless=True)
+app_launcher = AppLauncher(headless=HEADLESS)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
@@ -465,7 +467,7 @@ class TestContactSensor(unittest.TestCase):
         # write data to simulation
         self.scene.write_data_to_sim()
         # simulate
-        self.sim.step(render=False)
+        self.sim.step(render=not HEADLESS)
         # update buffers at sim dt
         self.scene.update(dt=self.sim_dt)
 

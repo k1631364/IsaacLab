@@ -3,8 +3,4 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""
-Submodule for different interpolation methods.
-"""
-
-from .linear_interpolation import LinearInterpolation
+from . import rsl_rl_ppo_cfg  # noqa: F401, F403

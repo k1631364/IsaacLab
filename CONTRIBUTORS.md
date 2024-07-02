@@ -36,7 +36,6 @@ Guidelines for modifications:
 * Andrej Orsula
 * Antonio Serrano-Muñoz
 * Arjun Bhardwaj
-* Brayden Zhang
 * Calvin Yu
 * Chenyu Yang
 * Jia Lin Yuan

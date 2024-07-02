@@ -45,6 +45,8 @@ from omni.isaac.lab.sim import SimulationContext
 
 def design_scene():
     """Designs the scene."""
+    # GroundPlaneCfg can be found in /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/sim/spawners/from_files/from_files_cfg.py
+    # SpawnerCfg can be found in /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/sim/spawners/spawner_cfg.py
     # Ground-plane
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
@@ -54,6 +56,9 @@ def design_scene():
 
     # Create separate groups called "Origin1", "Origin2", "Origin3"
     # Each group will have a robot in it
+    # module_path = prim_utils.__file__
+    # print(f"The module 'omni.isaac.core.utils.prims' is being imported from: {module_path}")
+    # Create prim can be found in /workspace/isaaclab/_isaac_sim/exts/omni.isaac.core/omni/isaac/core/utils/prims.py
     origins = [[0.25, 0.25, 0.0], [-0.25, 0.25, 0.0], [0.25, -0.25, 0.0], [-0.25, -0.25, 0.0]]
     for i, origin in enumerate(origins):
         prim_utils.create_prim(f"/World/Origin{i}", "Xform", translation=origin)
@@ -95,6 +100,8 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, RigidObj
             # reset counters
             sim_time = 0.0
             count = 0
+            # To reset the simulation state of the spawned rigid object prims, we need to set their pose and velocity. Together they define the root state of the spawned rigid objects. 
+            # https://isaac-sim.github.io/IsaacLab/source/tutorials/01_assets/run_rigid_object.html
             # reset root state
             root_state = cone_object.data.default_root_state.clone()
             # sample a random position on a cylinder around the origins
@@ -102,12 +109,36 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, RigidObj
             root_state[:, :3] += math_utils.sample_cylinder(
                 radius=0.1, h_range=(0.25, 0.5), size=cone_object.num_instances, device=cone_object.device
             )
-            # write root state to simulation
+            # write root state to simulation            
             cone_object.write_root_state_to_sim(root_state)
             # reset buffers
             cone_object.reset()
             print("----------------------------------------")
             print("[INFO]: Resetting object state...")
+        
+        # If you want to change linear velocity instead of pos, 
+        # root_state[:, 7:10] += root_state[:, 7:10]+0.5
+        # Data representation is defined in /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/assets/rigid_object/rigid_object_data.py
+        # root_state = cone_object.data.default_root_state.clone()
+        original_vel = root_state[:, 7:]
+        num_obj = original_vel.shape[0]
+        vel_dim = original_vel.shape[1]
+        new_linvel = torch.full((num_obj,3), 0.5)
+        new_angvel = torch.full((num_obj,3), 0.0)
+        new_linvel = new_linvel.to(cone_object.device)
+        new_angvel = new_angvel.to(cone_object.device)
+        # new_linvel = original_vel[:,:3]+0.0
+        # new_angvel = original_vel[:,3:]+0.0
+        # new_linvel[2,:] = original_vel[2,:3]+0.2
+        new_linvel[:,0] = original_vel[:,0]+0.2
+        # print(new_linvel.shape)
+        # print(new_angvel.shape)
+        # print("original vel")
+        # print(original_vel)
+        # print(new_linvel)
+        
+        cone_object.set_velocities(new_linvel, new_angvel)
+        
         # apply sim data
         cone_object.write_data_to_sim()
         # perform step

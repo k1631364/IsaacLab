@@ -16,11 +16,11 @@
 
     ManagerBasedEnv
     ManagerBasedEnvCfg
+    ViewerCfg
     ManagerBasedRLEnv
     ManagerBasedRLEnvCfg
     DirectRLEnv
     DirectRLEnvCfg
-    ViewerCfg
 
 Manager Based Environment
 -------------------------
@@ -31,6 +31,10 @@ Manager Based Environment
 .. autoclass:: ManagerBasedEnvCfg
     :members:
     :exclude-members: __init__, class_type
+
+.. autoclass:: ViewerCfg
+    :members:
+    :exclude-members: __init__
 
 Manager Based RL Environment
 ----------------------------
@@ -59,10 +63,3 @@ Direct RL Environment
     :inherited-members:
     :show-inheritance:
     :exclude-members: __init__, class_type
-
-Common
-------
-
-.. autoclass:: ViewerCfg
-    :members:
-    :exclude-members: __init__

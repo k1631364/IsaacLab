@@ -1,15 +1,15 @@
 .. _migrating-from-orbit:
 
-From Orbit
-==========
+Migrating from Orbit
+====================
 
 .. currentmodule:: omni.isaac.lab
 
-Since `Orbit`_ was used as basis for Isaac Lab, migrating from Orbit to Isaac Lab is straightforward.
+Since Orbit was used as basis for Isaac Lab, migrating from Orbit to Isaac Lab is straightforward.
 The following sections describe the changes that need to be made to your code to migrate from Orbit to Isaac Lab.
 
-Renaming of the launch script
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Updates to scripts
+~~~~~~~~~~~~~~~~~~
 
 The script ``orbit.sh`` has been renamed to ``isaaclab.sh``.
 
@@ -18,8 +18,7 @@ Updates to extensions
 ~~~~~~~~~~~~~~~~~~~~~
 
 The extensions ``omni.isaac.orbit``, ``omni.isaac.orbit_tasks``, and ``omni.isaac.orbit_assets`` have been renamed
-to ``omni.isaac.lab``, ``omni.isaac.lab_tasks``, and ``omni.isaac.lab_assets``, respectively. Thus,
-the new folder structure looks like this:
+to ``omni.isaac.lab``, ``omni.isaac.lab_tasks``, and ``omni.isaac.lab_assets``, respectively. Thus, the new folder structure looks like this:
 
 - ``source/extensions/omni.isaac.lab/omni/isaac/lab``
 - ``source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks``
@@ -74,7 +73,7 @@ This change must also be reflected in the imports for your tasks. For example,
 
   from omni.isaac.orbit_tasks.locomotion.velocity.velocity_env_cfg ...
 
-should now be:
+should now be
 
 .. code-block:: python
 
@@ -87,8 +86,8 @@ Other Breaking changes
 Offscreen rendering
 -------------------
 
-The input argument ``--offscreen_render`` given to :class:`omni.isaac.lab.app.AppLauncher` and the environment variable
-``OFFSCREEN_RENDER`` have been renamed to ``--enable_cameras`` and ``ENABLE_CAMERAS`` respectively.
+The input argument ``--offscreen_render`` given to :class:`omni.isaac.lab.app.AppLauncher` and the environment variable ``OFFSCREEN_RENDER``
+have been renamed to ``--enable_cameras`` and ``ENABLE_CAMERAS`` respectively.
 
 
 Event term distribution configuration
@@ -112,7 +111,7 @@ Therefore, event term configurations whose functions have a ``distribution`` arg
       },
   )
 
-should now be:
+should now be
 
 .. code-block:: python
   :emphasize-lines: 6
@@ -126,6 +125,3 @@ should now be:
           "operation": "add",
       },
   )
-
-
-.. _Orbit: https://isaac-orbit.github.io/

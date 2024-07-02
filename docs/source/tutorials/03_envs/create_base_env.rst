@@ -1,4 +1,4 @@
-.. _tutorial-create-manager-base-env:
+.. _tutorial-create-base-env:
 
 
 Creating a Manager-Based Base Environment

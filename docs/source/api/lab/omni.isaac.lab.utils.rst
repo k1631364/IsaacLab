@@ -10,9 +10,7 @@
       io
       array
       assets
-      buffers
       dict
-      interpolation
       math
       noise
       string
@@ -54,29 +52,11 @@ Asset operations
    :members:
    :show-inheritance:
 
-Buffer operations
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: omni.isaac.lab.utils.buffers
-   :members:
-   :imported-members:
-   :inherited-members:
-   :show-inheritance:
-
 Dictionary operations
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: omni.isaac.lab.utils.dict
    :members:
-   :show-inheritance:
-
-Interpolation operations
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: omni.isaac.lab.utils.interpolation
-   :members:
-   :imported-members:
-   :inherited-members:
    :show-inheritance:
 
 Math operations

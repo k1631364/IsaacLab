@@ -23,16 +23,8 @@ from omni.isaac.lab.utils.math import sample_uniform
 
 @configclass
 class CartpoleEnvCfg(DirectRLEnvCfg):
-    # env
-    decimation = 2
-    episode_length_s = 5.0
-    action_scale = 100.0  # [N]
-    num_actions = 1
-    num_observations = 4
-    num_states = 0
-
     # simulation
-    sim: SimulationCfg = SimulationCfg(dt=1 / 120, render_interval=decimation)
+    sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
     # robot
     robot_cfg: ArticulationCfg = CARTPOLE_CFG.replace(prim_path="/World/envs/env_.*/Robot")
@@ -41,6 +33,14 @@ class CartpoleEnvCfg(DirectRLEnvCfg):
 
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=4.0, replicate_physics=True)
+
+    # env
+    decimation = 2
+    episode_length_s = 5.0
+    action_scale = 100.0  # [N]
+    num_actions = 1
+    num_observations = 4
+    num_states = 0
 
     # reset
     max_cart_pos = 3.0  # the cart is reset if it exceeds that position [m]
@@ -96,6 +96,8 @@ class CartpoleEnv(DirectRLEnv):
             ),
             dim=-1,
         )
+        # print("Obs shapeeeeee")
+        # print(obs.shape)
         observations = {"policy": obs}
         return observations
 

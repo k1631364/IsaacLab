@@ -287,6 +287,7 @@ case $mode in
         # upon
         docker compose --file docker-compose.yaml --env-file .env.base build isaac-lab-base
         docker compose $add_yamls $add_profiles $add_envs up --detach --build --remove-orphans
+
         popd > /dev/null 2>&1
         ;;
     enter)

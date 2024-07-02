@@ -5,6 +5,6 @@
 
 """Sub-module containing different buffers."""
 
-from .circular_buffer import CircularBuffer
+from .circular_buffer import BatchedCircularBuffer
 from .delay_buffer import DelayBuffer
 from .timestamped_buffer import TimestampedBuffer

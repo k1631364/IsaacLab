@@ -76,7 +76,7 @@ class RigidObject(AssetBase):
 
     @property
     def body_names(self) -> list[str]:
-        """Ordered names of bodies in the rigid object."""
+        """Ordered names of bodies in articulation."""
         prim_paths = self.root_physx_view.prim_paths[: self.num_bodies]
         return [path.split("/")[-1] for path in prim_paths]
 
@@ -114,6 +114,8 @@ class RigidObject(AssetBase):
         # reset external wrench
         self._external_force_b[env_ids] = 0.0
         self._external_torque_b[env_ids] = 0.0
+        self._external_linvel_b[env_ids] = 0.0
+        self._external_angvel_b[env_ids] = 0.0
 
     def write_data_to_sim(self):
         """Write external wrench to the simulation.
@@ -131,6 +133,17 @@ class RigidObject(AssetBase):
                 indices=self._ALL_BODY_INDICES,
                 is_global=False,
             )
+
+        if self.has_external_velociy:
+            # new_vel = torch.cat((self._external_linvel_b, self._external_angvel_b))
+            new_vel = torch.hstack((self._external_linvel_b, self._external_angvel_b))
+            self.root_physx_view.set_velocities(new_vel, indices=self._ALL_BODY_INDICES)
+
+        # print("!!!!Check!!!!")
+        # print(self._data.root_state_w[:, 7:])
+        # new_vel = self._data.root_state_w[:, 7:]+0.05
+        # self.root_physx_view.set_velocities(new_vel, indices=self._ALL_BODY_INDICES)
+
 
     def update(self, dt: float):
         self._data.update(dt)
@@ -275,6 +288,50 @@ class RigidObject(AssetBase):
             self._external_torque_b.flatten(0, 1)[indices] = torques.flatten(0, 1)
         else:
             self.has_external_wrench = False
+    
+    # Other root state that can be changed when running simulation
+    # Note that these can be changed during simulation or at reset of scene
+    # pos: Position (typically 3 values, representing x, y, z coordinates).
+    # quat: Quaternion (typically 4 values, representing orientation).
+    # lin_vel: Linear velocity (typically 3 values).
+    # ang_vel: Angular velocity (typically 3 values).
+    def set_velocities(
+        self,
+        lin_vels: torch.Tensor,  # linear velocities (3dim. )
+        ang_vels: torch.Tensor,  # angular velocities (3dim. )
+        body_ids: Sequence[int] | slice | None = None,
+        env_ids: Sequence[int] | None = None,
+    ):
+        if lin_vels.any() or ang_vels.any():
+            self.has_external_velociy = True
+            # resolve all indices
+            # -- env_ids
+            if env_ids is None:
+                env_ids = self._ALL_INDICES
+            elif not isinstance(env_ids, torch.Tensor):
+                env_ids = torch.tensor(env_ids, dtype=torch.long, device=self.device)
+            # -- body_ids
+            if body_ids is None:
+                body_ids = torch.arange(self.num_bodies, dtype=torch.long, device=self.device)
+            elif isinstance(body_ids, slice):
+                body_ids = torch.arange(self.num_bodies, dtype=torch.long, device=self.device)[body_ids]
+            elif not isinstance(body_ids, torch.Tensor):
+                body_ids = torch.tensor(body_ids, dtype=torch.long, device=self.device)
+
+            # note: we need to do this complicated indexing since torch doesn't support multi-indexing
+            # create global body indices from env_ids and env_body_ids
+            # (env_id * total_bodies_per_env) + body_id
+            indices = body_ids.repeat(len(env_ids), 1) + env_ids.unsqueeze(1) * self.num_bodies
+            indices = indices.view(-1)
+            # set into internal buffers
+            # note: these are applied in the write_to_sim function
+            # self._external_linvel_b.flatten(0, 1)[indices] = lin_vels.flatten(0, 1)
+            # self._external_angvel_b.flatten(0, 1)[indices] = ang_vels.flatten(0, 1)
+
+            self._external_linvel_b.flatten(0, 1)[indices] = lin_vels
+            self._external_angvel_b.flatten(0, 1)[indices] = ang_vels
+        else:
+            self.has_external_velociy = False
 
     """
     Internal helper.
@@ -340,7 +397,10 @@ class RigidObject(AssetBase):
         self._external_force_b = torch.zeros((self.num_instances, self.num_bodies, 3), device=self.device)
         self._external_torque_b = torch.zeros_like(self._external_force_b)
 
-        # set information about rigid body into data
+        self.has_external_velociy = False
+        self._external_linvel_b = torch.zeros((self.num_instances, self.num_bodies, 3), device=self.device)
+        self._external_angvel_b = torch.zeros_like(self._external_linvel_b)
+
         self._data.body_names = self.body_names
         self._data.default_mass = self.root_physx_view.get_masses().clone()
 

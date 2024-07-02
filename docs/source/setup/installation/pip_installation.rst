@@ -21,52 +21,37 @@ Installing Isaac Sim
 -  To use the pip installation approach for Isaac Sim, we recommend first creating a virtual environment.
    Ensure that the python version of the virtual environment is **Python 3.10**.
 
-   .. tab-set::
+   .. tabs::
 
-      .. tab-item:: conda environment
+      .. tab:: Conda
 
          .. code-block:: bash
 
             conda create -n isaaclab python=3.10
             conda activate isaaclab
 
-      .. tab-item:: venv environment
+      .. tab:: Virtual environment (venv)
 
-         .. tab-set::
-            :sync-group: os
+         .. code-block:: bash
 
-            .. tab-item:: :icon:`fa-brands fa-linux` Linux
-               :sync: linux
-
-               .. code-block:: bash
-
-                  # create a conda environment named isaaclab with python3.10
-                  python3.10 -m venv isaaclab
-                  # activate the conda environment
-                  source isaaclab/bin/activate
-
-            .. tab-item:: :icon:`fa-brands fa-windows` Windows
-               :sync: windows
-
-               .. code-block:: batch
-
-                  # create a virtual environment named isaaclab with python3.10
-                  python3.10 -m venv isaaclab
-                  # activate the virtual environment
-                  isaaclab\Scripts\activate
+            python3.10 -m venv isaaclab
+            # on Linux
+            source isaaclab/bin/activate
+            # on Windows
+            isaaclab\Scripts\activate
 
 
 -  Next, install a CUDA-enabled PyTorch 2.2.2 build based on the CUDA version available on your system.
 
-   .. tab-set::
+   .. tabs::
 
-      .. tab-item:: CUDA 11
+      .. tab:: CUDA 11
 
          .. code-block:: bash
 
             pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cu118
 
-      .. tab-item:: CUDA 12
+      .. tab:: CUDA 12
 
          .. code-block:: bash
 
@@ -95,30 +80,20 @@ Cloning Isaac Lab
 
 Clone the Isaac Lab repository into your workspace:
 
-.. tab-set::
+.. code:: bash
 
-   .. tab-item:: SSH
-
-      .. code:: bash
-
-         git clone git@github.com:isaac-sim/IsaacLab.git
-
-   .. tab-item:: HTTPS
-
-      .. code:: bash
-
-         git clone https://github.com/isaac-sim/IsaacLab.git
-
+   # Option 1: With SSH
+   git clone git@github.com:isaac-sim/IsaacLab.git
+   # Option 2: With HTTPS
+   git clone https://github.com/isaac-sim/IsaacLab.git
 
 .. note::
    We provide a helper executable `isaaclab.sh <https://github.com/isaac-sim/IsaacLab/blob/main/isaaclab.sh>`_ that provides
    utilities to manage extensions:
 
-   .. tab-set::
-      :sync-group: os
+   .. tabs::
 
-      .. tab-item:: :icon:`fa-brands fa-linux` Linux
-         :sync: linux
+      .. tab:: Linux
 
          .. code:: text
 
@@ -138,8 +113,7 @@ Clone the Isaac Lab repository into your workspace:
                -d, --docs           Build the documentation from source using sphinx.
                -c, --conda [NAME]   Create the conda environment for Isaac Lab. Default name is 'isaaclab'.
 
-      .. tab-item:: :icon:`fa-brands fa-windows` Windows
-         :sync: windows
+      .. tab:: Windows
 
          .. code:: text
 
@@ -170,43 +144,36 @@ Installation
 - Run the install command that iterates over all the extensions in ``source/extensions`` directory and installs them
   using pip (with ``--editable`` flag):
 
-.. tab-set::
-   :sync-group: os
+.. tabs::
 
-   .. tab-item:: :icon:`fa-brands fa-linux` Linux
-      :sync: linux
+   .. tab:: Linux
 
       .. code:: bash
 
          ./isaaclab.sh --install # or "./isaaclab.sh -i"
 
-   .. tab-item:: :icon:`fa-brands fa-windows` Windows
-      :sync: windows
+   .. tab:: Windows
 
       .. code:: bash
 
          isaaclab.bat --install :: or "isaaclab.bat -i"
 
 .. note::
-
    By default, this will install all the learning frameworks. If you want to install only a specific framework, you can
    pass the name of the framework as an argument. For example, to install only the ``rl_games`` framework, you can run
 
-   .. tab-set::
-      :sync-group: os
+   .. tabs::
 
-      .. tab-item:: :icon:`fa-brands fa-linux` Linux
-         :sync: linux
+      .. tab:: Linux
 
          .. code:: bash
 
-            ./isaaclab.sh --install rl_games  # or "./isaaclab.sh -i rl_games"
+            ./isaaclab.sh --install rl_games
 
-      .. tab-item:: :icon:`fa-brands fa-windows` Windows
-         :sync: windows
+      .. tab:: Windows
 
          .. code:: bash
 
-            isaaclab.bat --install rl_games :: or "isaaclab.bat -i rl_games"
+            isaaclab.bat --install rl_games :: or "isaaclab.bat -i"
 
    The valid options are ``rl_games``, ``rsl_rl``, ``sb3``, ``skrl``, ``robomimic``, ``none``.

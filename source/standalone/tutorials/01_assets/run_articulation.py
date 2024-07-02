@@ -33,6 +33,7 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import torch
+import math
 
 import omni.isaac.core.utils.prims as prim_utils
 
@@ -64,6 +65,7 @@ def design_scene() -> tuple[dict, list[list[float]]]:
     prim_utils.create_prim("/World/Origin2", "Xform", translation=origins[1])
 
     # Articulation
+    # CartpoleCfg is in /workspace/isaaclab/source/extensions/omni.isaac.lab_assets/omni/isaac/lab_assets/cartpole.py
     cartpole_cfg = CARTPOLE_CFG.copy()
     cartpole_cfg.prim_path = "/World/Origin.*/Robot"
     cartpole = Articulation(cfg=cartpole_cfg)
@@ -95,6 +97,8 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             root_state = robot.data.default_root_state.clone()
             root_state[:, :3] += origins
             robot.write_root_state_to_sim(root_state)
+            # Joint state is defined in /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/assets/articulation/articulation.py
+            # Root state is defined by inheriting from RigidObject
             # set joint positions with some noise
             joint_pos, joint_vel = robot.data.default_joint_pos.clone(), robot.data.default_joint_vel.clone()
             joint_pos += torch.rand_like(joint_pos) * 0.1
@@ -106,7 +110,17 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
         # -- generate random joint efforts
         efforts = torch.randn_like(robot.data.joint_pos) * 5.0
         # -- apply action to the robot
-        robot.set_joint_effort_target(efforts)
+        # robot.set_joint_effort_target(efforts)
+
+        # To control joint position instead of join effort, 
+        # Note that you need to set stiffness and damping of cartpole joint to 100 and 10 instead of 0 and 10 as in joint effort control in /workspace/isaaclab/source/extensions/omni.isaac.lab_assets/omni/isaac/lab_assets/cartpole.py 
+        # pos = torch.tensor([[-0.1, 0.1],[0.1, 0.1]])
+        # robot.set_joint_position_target(pos)
+
+        # To control joint velocity, 
+        # Note that you need to set stiffness and damping of cartpole joint to 0 and 10 in /workspace/isaaclab/source/extensions/omni.isaac.lab_assets/omni/isaac/lab_assets/cartpole.py 
+        vel = torch.tensor([[0.5, 0.1],[0.5, 0.1]])
+        robot.set_joint_velocity_target(vel)
         # -- write data to sim
         robot.write_data_to_sim()
         # Perform step

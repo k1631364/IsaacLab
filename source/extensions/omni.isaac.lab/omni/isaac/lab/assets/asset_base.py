@@ -80,6 +80,8 @@ class AssetBase(ABC):
             )
         # check that spawn was successful
         matching_prims = sim_utils.find_matching_prims(self.cfg.prim_path)
+        print("Matching primsss")
+        print(matching_prims)
         if len(matching_prims) == 0:
             raise RuntimeError(f"Could not find prim with path {self.cfg.prim_path}.")
 
@@ -119,14 +121,6 @@ class AssetBase(ABC):
     """
     Properties
     """
-
-    @property
-    def is_initialized(self) -> bool:
-        """Whether the asset is initialized.
-
-        Returns True if the asset is initialized, False otherwise.
-        """
-        return self._is_initialized
 
     @property
     @abstractmethod

@@ -58,15 +58,22 @@ def design_scene():
         height=0.5,
         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
     )
-    cfg_cone.func("/World/Objects/Cone1", cfg_cone, translation=(-1.0, 1.0, 1.0))
-    cfg_cone.func("/World/Objects/Cone2", cfg_cone, translation=(-1.0, -1.0, 1.0))
+    cfg_cone.func("/World/Objects/Cone1", cfg_cone, translation=(-1.0, 1.0, 1.0), orientation=(0.2, 0.0, 0.2, 0.0))
+    cfg_cone.func("/World/Objects/Cone2", cfg_cone, translation=(-1.0, -1.0, 1.0), orientation=(1.0, 0.0, 0.2, 0.0))
+
+    # Added my cuboid
+    cfg_cuboid = sim_utils.CuboidCfg(
+        size=(0.5, 0.5, 0.5), 
+        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+    )
+    cfg_cuboid.func("/World/Objects/Cuboid1", cfg_cuboid, translation=(-1.0, 2.0, 1.0))
 
     # spawn a green cone with colliders and rigid body
     cfg_cone_rigid = sim_utils.ConeCfg(
         radius=0.15,
         height=0.5,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-        mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+        mass_props=sim_utils.MassPropertiesCfg(mass=1.0, density=0.2),  # Added density (Refer to schemas/schemas_cfg.py)
         collision_props=sim_utils.CollisionPropertiesCfg(),
         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
     )
@@ -74,16 +81,17 @@ def design_scene():
         "/World/Objects/ConeRigid", cfg_cone_rigid, translation=(0.0, 0.0, 2.0), orientation=(0.5, 0.0, 0.5, 0.0)
     )
 
+    # Actual directory path can be found in  /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/utils/assets.py
+    # For more usd files, open omniverse app, go to NUCLEUS, and localhost/NVIDIA/Assets/Isaac/4.0/Isaac/Props/DeformableTube
     # spawn a usd file of a table into the scene
     cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd")
     cfg.func("/World/Objects/Table", cfg, translation=(0.0, 0.0, 1.05))
-
-
+    
 def main():
     """Main function."""
 
     # Initialize the simulation context
-    sim_cfg = sim_utils.SimulationCfg(dt=0.01)
+    sim_cfg = sim_utils.SimulationCfg(dt=0.01, substeps=1)
     sim = sim_utils.SimulationContext(sim_cfg)
     # Set main camera
     sim.set_camera_view([2.0, 0.0, 2.5], [-0.5, 0.0, 0.5])

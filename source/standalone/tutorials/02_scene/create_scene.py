@@ -22,6 +22,7 @@ from omni.isaac.lab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Tutorial on using the interactive scene interface.")
 parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--env_spacing", type=float, default=2.0, help="Spacing betweent environments to spawn.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -114,7 +115,8 @@ def main():
     # Set main camera
     sim.set_camera_view([2.5, 0.0, 4.0], [0.0, 0.0, 2.0])
     # Design scene
-    scene_cfg = CartpoleSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
+    # scene_cfg = CartpoleSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
+    scene_cfg = CartpoleSceneCfg(num_envs=args_cli.num_envs, env_spacing=args_cli.env_spacing)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()

@@ -57,6 +57,8 @@ def main():
             obs, rew, terminated, truncated, info = env.step(joint_efforts)
             # print current orientation of pole
             print("[Env 0]: Pole joint: ", obs["policy"][0][1].item())
+            # print("[Env 0]: Reward: ", rew[0].item())
+            print(rew.shape)
             # update counter
             count += 1
 
