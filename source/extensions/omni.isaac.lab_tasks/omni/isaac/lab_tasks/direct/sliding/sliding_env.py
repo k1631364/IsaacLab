@@ -273,8 +273,9 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # episode length is determined by decimation (e.g., 2), physics timestep (e.g., dt=1 / 120), and episode_length_s (e.g., 5)
     # In this case, 300 = ceil(5.0 / (2 * 1/120))
     # episode_length_steps = ceil(episode_length_s / (decimation_rate * physics_time_step))
+    # control_frequency = 1 / (decimation_rate * physics_time_step) lower control freq like 30Hz leads to more stable learning
     # See /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/envs/rl_env_cfg.py for more details
-    decimation = 2
+    decimation = 5
     episode_length_s = 5.0
     # action_scale = 100.0  # [N]
     action_scale = 1.0
@@ -620,19 +621,23 @@ class SlidingEnv(DirectRLEnv):
 
         # Check if it reaches the goal
         goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx    # becomes false if overshoot
-        goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.min_goal_posx
+        goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.min_goal_posx    # becomes true once in goal region
 
         curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
         self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
 
-        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
+        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>=self.cfg.max_puck_goalcount
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
-        print("chekcing puck goal ")
-        print(goal_bounds_min_puck_posx)
+        # print("chekcing puck goal ")
+        # print(self.out_of_bounds_goal_puck_posx_count)
+        # print(self.cfg.max_puck_goalcount)
+        # print(self.goal_bounds)
 
-        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx # | self.goal_bounds
+        # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx # | self.goal_bounds
+        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | self.goal_bounds
+
         # print(out_of_bounds)
 
         time_out = self.episode_length_buf >= self.max_episode_length - 1
