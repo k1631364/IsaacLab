@@ -152,6 +152,9 @@ class DirectRLEnv(gym.Env):
         self.episode_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
         self.reset_terminated = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.reset_time_outs = torch.zeros_like(self.reset_terminated)
+        self.goal_reached = torch.zeros_like(self.reset_terminated)
+        self.episode_failed = torch.zeros_like(self.reset_terminated)
+        self.success_record = torch.zeros_like(self.reset_terminated)
         self.reset_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.sim.device)
         self.actions = torch.zeros(self.num_envs, self.cfg.num_actions, device=self.sim.device)
         # setup the action and observation spaces for Gym
@@ -288,7 +291,7 @@ class DirectRLEnv(gym.Env):
         self.episode_length_buf += 1  # step in current episode (per env)
         self.common_step_counter += 1  # total step (common for all envs)
 
-        self.reset_terminated[:], self.reset_time_outs[:] = self._get_dones()
+        self.reset_terminated[:], self.reset_time_outs[:], self.goal_reached[:], self.episode_failed[:] = self._get_dones()
         self.reset_buf = self.reset_terminated | self.reset_time_outs
         self.reward_buf = self._get_rewards()
 
@@ -308,6 +311,26 @@ class DirectRLEnv(gym.Env):
         # add observation noise
         if self.cfg.observation_noise_model:
             self.obs_buf["policy"] = self._observation_noise_model.apply(self.obs_buf["policy"])
+
+        # Compute success rate
+        # self.goal_reached
+        # print(self.episode_failed)      
+
+        success_tensor = self.goal_reached
+        failed_tensor = self.episode_failed
+
+        # Update record_tensor based on success_tensor and failed_tensor
+        self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+        self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
+
+        # print(self.success_record.int())
+
+        success_rate = (self.success_record.int().sum())/self.num_envs
+        # print(self.success_record.int().sum())
+        # print(self.num_envs)
+        # print(success_rate)
+
+        self.extras["log"] = {"success_rate": success_rate}
 
         # return observations, rewards, resets and extras
         return self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, self.extras

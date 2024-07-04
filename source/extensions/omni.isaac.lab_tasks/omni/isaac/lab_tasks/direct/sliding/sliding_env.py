@@ -125,7 +125,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.8, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.9, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
     cuboidtable2_cfg: RigidObjectCfg = RigidObjectCfg(
@@ -166,7 +166,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     ) 
 
     # Goal
-    goal_location = -0.35  # the cart is reset if it exceeds that position [m]
+    goal_location = -0.45  # the cart is reset if it exceeds that position [m]
     gaol_length = 0.5
     max_goal_posx = (goal_location-(gaol_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
     min_goal_posx = goal_location+(gaol_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
@@ -304,10 +304,10 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     rew_scale_distance = 0.01
     rew_scale_goal = 100.0
     rew_scale_timestep = 0.01
+    rew_scale_pushervel = 1.0
     # rew_scale_pole_pos = -1.0
     # rew_scale_cart_vel = -0.01
     # rew_scale_pole_vel = -0.005
-
 
 class SlidingEnv(DirectRLEnv):
     cfg: SlidingEnvCfg
@@ -505,6 +505,16 @@ class SlidingEnv(DirectRLEnv):
         # curr_cuboidpuck2_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[:, 7:])
         # print(curr_cuboidpuck2_state[0,0])
 
+        curr_cuboidpusher2_state = self.cuboidpusher2_state.clone()
+        curr_cuboidpusher2_state[:, 0:3] = (
+            curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
+        )
+
+        # print(curr_cuboidpusher2_state[:,7])
+
+        # print("Pusher velocity!!!!!!!!")
+        # print(curr_cuboidpusher2_state[0,7])
+
         # goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx
         # goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.min_goal_posx
 
@@ -521,6 +531,7 @@ class SlidingEnv(DirectRLEnv):
             self.cfg.rew_scale_distance, 
             self.cfg.rew_scale_goal, 
             self.cfg.rew_scale_timestep, 
+            self.cfg.rew_scale_pushervel, 
             # self.cfg.rew_scale_pole_pos,
             # self.cfg.rew_scale_cart_vel,
             # self.cfg.rew_scale_pole_vel,
@@ -529,6 +540,7 @@ class SlidingEnv(DirectRLEnv):
             # self.joint_pos[:, self._cart_dof_idx[0]],
             # self.joint_vel[:, self._cart_dof_idx[0]],
             curr_cuboidpuck2_state[:,0], 
+            curr_cuboidpusher2_state[:,7], 
             self.reset_terminated,
             self.cfg.goal_location, 
             # self.cfg.max_goal_posx,
@@ -630,6 +642,10 @@ class SlidingEnv(DirectRLEnv):
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
+        # print("Goallllll")
+        # if self.goal_bounds[0]:
+        #     print(self.goal_bounds)
+
         # print("chekcing puck goal ")
         # print(self.out_of_bounds_goal_puck_posx_count)
         # print(self.cfg.max_puck_goalcount)
@@ -661,7 +677,10 @@ class SlidingEnv(DirectRLEnv):
         # return false_tensor, false_tensor
         # return true_tensor, true_tensor
         # print(self.cuboidpusher2_state[0,0])
-        return out_of_bounds, time_out
+
+        episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | time_out
+
+        return out_of_bounds, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")
@@ -783,6 +802,7 @@ def compute_rewards(
     rew_scale_distance: float, 
     rew_scale_goal: float, 
     rew_scale_timestep: float, 
+    rew_scale_pushervel: float, 
     # rew_scale_pole_pos: float,
     # rew_scale_cart_vel: float,
     # rew_scale_pole_vel: float,
@@ -791,6 +811,7 @@ def compute_rewards(
     # cart_pos: torch.Tensor,
     # cart_vel: torch.Tensor,
     curr_cuboidpuck2_state: torch.Tensor,  
+    curr_cuboidpusher2_state: torch.Tensor,  
     reset_terminated: torch.Tensor,
     goal_location: float, 
     # max_goal_posx: float, 
@@ -822,6 +843,10 @@ def compute_rewards(
     rew_goal = rew_scale_goal * goal_bounds.int()
     # print(goal_bounds)
 
+    normalized_pushervel = torch.abs(curr_cuboidpusher2_state) / 3.0
+    rew_pushervel = rew_scale_pushervel * (1.0-normalized_pushervel)
+    # print(rew_pushervel)
+
 
     # rew_pole_pos = rew_scale_pole_pos * torch.sum(torch.square(pole_pos).unsqueeze(dim=1), dim=-1)
     # rew_cart_vel = rew_scale_cart_vel * torch.sum(torch.abs(cart_vel).unsqueeze(dim=1), dim=-1)
@@ -829,7 +854,7 @@ def compute_rewards(
     # total_reward = rew_alive + rew_termination + rew_pole_pos + rew_cart_vel + rew_pole_vel
     # total_reward = rew_alive + rew_termination 
     # total_reward = rew_alive + rew_termination + rew_goal
-    total_reward = rew_goal + rew_termination + rew_distance + rew_timestep
+    total_reward = rew_goal + rew_termination + rew_distance # + rew_pushervel + rew_timestep
     # print(rew_distance)
     # print(curr_cuboidpuck2_state)
     # print(goal_location)

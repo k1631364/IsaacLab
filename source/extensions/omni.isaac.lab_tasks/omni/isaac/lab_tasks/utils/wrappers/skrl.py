@@ -215,6 +215,13 @@ class SkrlSequentialLogTrainer(Trainer):
                     timesteps=self.timesteps,
                 )
             # log custom environment data
+            # print("Infosssss")
+            # print(infos)
+            # if terminated[0,0]:
+            #     print(terminated)
+            # single_value_tensor = torch.tensor(3.14)
+            # infos["log"] = {"tttt": single_value_tensor}
+            # print(infos)
             if "log" in infos:
                 for k, v in infos["log"].items():
                     if isinstance(v, torch.Tensor) and v.numel() == 1:
