@@ -87,6 +87,15 @@ RUN echo "export ISAACLAB_PATH=${ISAACLAB_PATH}" >> ${HOME}/.bashrc && \
     echo "alias tensorboard='${ISAACLAB_PATH}/_isaac_sim/python.sh ${ISAACLAB_PATH}/_isaac_sim/tensorboard'" >> ${HOME}/.bashrc && \
     echo "export TZ=$(date +%Z)" >> ${HOME}/.bashrc
 
+# RUN echo "set to: ${ISAACSIM_ROOT_PATH}"
+# RUN echo "ISAACLAB_PATH is set to: ${ISAACLAB_PATH}"
+# RUN ${ISAACSIM_ROOT_PATH}/python.sh -m pip install wandb
+
+# Set environment variable during build time
+ARG WANDB_API_KEY
+ENV WANDB_API_KEY=${WANDB_API_KEY}
+
+
 # make working directory as the Isaac Lab directory
 # this is the default directory when the container is run
 WORKDIR ${ISAACLAB_PATH}

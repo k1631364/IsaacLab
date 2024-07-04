@@ -50,7 +50,7 @@ import gymnasium as gym
 import os
 from datetime import datetime
 
-from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
+from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG,PPO_RNN
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -87,6 +87,7 @@ def main():
     # set directory into agent config
     experiment_cfg["agent"]["experiment"]["directory"] = log_root_path
     experiment_cfg["agent"]["experiment"]["experiment_name"] = log_dir
+    experiment_cfg["agent"]["experiment"]["wandb_kwargs"]["name"] = log_dir
     # update log_dir
     log_dir = os.path.join(log_root_path, log_dir)
 
@@ -164,7 +165,7 @@ def main():
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
-    agent = PPO(
+    agent = PPO_RNN(
         models=models,
         memory=memory,
         cfg=agent_cfg,

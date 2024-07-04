@@ -3,7 +3,7 @@ seed: 42
 # Models are instantiated using skrl's model instantiator utility
 # https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
 models:
-  separate: False
+  separate: True
   policy:  # see skrl.utils.model_instantiators.torch.gaussian_model for parameter details
     clip_actions: True
     clip_log_std: True
@@ -57,7 +57,11 @@ agent:
     directory: "sliding_direct"
     experiment_name: ""
     write_interval: 16
-    checkpoint_interval: 80
+    checkpoint_interval: 1000
+    wandb: False,             # whether to use Weights & Biases
+    wandb_kwargs:
+      project: "isaac-sim-slidingtest"
+      name: "" # wandb kwargs (see https://docs.wandb.ai/ref/python/init)
     
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html

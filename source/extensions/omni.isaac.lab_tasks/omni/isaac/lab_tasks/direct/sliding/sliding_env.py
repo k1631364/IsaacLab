@@ -23,6 +23,12 @@ from omni.isaac.lab.utils.math import sample_uniform
 from omni.isaac.lab.assets import RigidObject, RigidObjectCfg
 from omni.isaac.lab.markers import VisualizationMarkers, VisualizationMarkersCfg
 
+from omni.isaac.lab.managers import EventTermCfg as EventTerm
+import omni.isaac.lab.envs.mdp as mdp
+from omni.isaac.lab.managers import SceneEntityCfg
+
+
+
 # from omni.isaac.core.objects import DynamicCuboid
 # import omni.isaac.core.utils.prims as prim_utils
 
@@ -160,10 +166,11 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     ) 
 
     # Goal
-    goal_location = -0.85  # the cart is reset if it exceeds that position [m]
-    gaol_length = 0.3
+    goal_location = -0.35  # the cart is reset if it exceeds that position [m]
+    gaol_length = 0.5
     max_goal_posx = (goal_location-(gaol_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
     min_goal_posx = goal_location+(gaol_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+    max_puck_goalcount = 20
 
     markergoal1_cfg = VisualizationMarkersCfg(
         prim_path="/Visual/Goal1",
@@ -268,7 +275,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # episode_length_steps = ceil(episode_length_s / (decimation_rate * physics_time_step))
     # See /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/envs/rl_env_cfg.py for more details
     decimation = 2
-    episode_length_s = 10.0
+    episode_length_s = 5.0
     # action_scale = 100.0  # [N]
     action_scale = 1.0
     num_actions = 1 # action dim
@@ -281,7 +288,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     max_puck_posx = 0.9  # the cart is reset if it exceeds that position [m]
     min_puck_posx = -0.95  # the cart is reset if it exceeds that position [m]
     min_puck_velx = 0.01
-    max_puck_restcount = 20
+    max_puck_restcount = 30
     # goal_location = -0.85  # the cart is reset if it exceeds that position [m]
     # gaol_length = 0.3
     # max_goal_posx = goal_location-(gaol_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
@@ -292,9 +299,10 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # # reward scales
     rew_scale_alive = 1.0
     # rew_scale_terminated = -2.0
-    rew_scale_terminated = -20.0
-    rew_scale_distance = 0.3
-    rew_scale_goal = 50.0
+    rew_scale_terminated = -70.0
+    rew_scale_distance = 0.01
+    rew_scale_goal = 100.0
+    rew_scale_timestep = 0.01
     # rew_scale_pole_pos = -1.0
     # rew_scale_cart_vel = -0.01
     # rew_scale_pole_vel = -0.005
@@ -329,6 +337,10 @@ class SlidingEnv(DirectRLEnv):
         self.out_of_bounds_min_puck_velx_count = torch.zeros((self.scene.env_origins.shape[0]))
         self.out_of_bounds_min_puck_velx_count = self.out_of_bounds_min_puck_velx_count.to(self.scene.env_origins.device)
 
+        self.out_of_bounds_goal_puck_posx_count = torch.zeros((self.scene.env_origins.shape[0]))
+        self.out_of_bounds_goal_puck_posx_count = self.out_of_bounds_goal_puck_posx_count.to(self.scene.env_origins.device)
+
+        self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -353,7 +365,6 @@ class SlidingEnv(DirectRLEnv):
         self.cuboidpuck2 = RigidObject(self.cfg.cuboidpuck2_cfg)
         self.cuboidpusher2 = RigidObject(self.cfg.cuboidpusher2_cfg)
         self.cuboidtable2 = RigidObject(self.cfg.cuboidtable2_cfg)
-        
 
         print("Env originannnnnn")
         print(self.scene.env_origins.shape)
@@ -493,12 +504,22 @@ class SlidingEnv(DirectRLEnv):
         # curr_cuboidpuck2_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[:, 7:])
         # print(curr_cuboidpuck2_state[0,0])
 
+        # goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx
+        # goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.min_goal_posx
+
+        # curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
+        # self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
+
+        # goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
+        # self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
+        # self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
         total_reward = compute_rewards(
             self.cfg.rew_scale_alive,
             self.cfg.rew_scale_terminated,
             self.cfg.rew_scale_distance, 
             self.cfg.rew_scale_goal, 
+            self.cfg.rew_scale_timestep, 
             # self.cfg.rew_scale_pole_pos,
             # self.cfg.rew_scale_cart_vel,
             # self.cfg.rew_scale_pole_vel,
@@ -509,8 +530,11 @@ class SlidingEnv(DirectRLEnv):
             curr_cuboidpuck2_state[:,0], 
             self.reset_terminated,
             self.cfg.goal_location, 
-            self.cfg.max_goal_posx,
-            self.cfg.min_goal_posx,
+            # self.cfg.max_goal_posx,
+            # self.cfg.min_goal_posx,
+            self.goal_bounds, 
+            self.episode_length_buf,
+            self.max_episode_length, 
         )
         # total_reward = compute_rewards(
         #     self.cfg.rew_scale_alive,
@@ -571,7 +595,7 @@ class SlidingEnv(DirectRLEnv):
         # Check for Puck overshoot (i.e., over goal region) "Be careful the sign!!!!"
         overshoot_max_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.max_goal_posx
 
-        # Check for Puck at reset (i.e., puck velocity is zero for sometime)
+        # Check for Puck at rest (i.e., puck velocity is zero for sometime)
         # print("Puck velocityyyyyy")
         # print(curr_cuboidpuck2_state[:,7])
         # print(curr_cuboidpusher2_state[:,7])
@@ -594,7 +618,21 @@ class SlidingEnv(DirectRLEnv):
         # else:
         #     self.consecutive_steps_count = 0
 
-        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx
+        # Check if it reaches the goal
+        goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx    # becomes false if overshoot
+        goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.min_goal_posx
+
+        curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
+        self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
+
+        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
+        self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
+        self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
+
+        print("chekcing puck goal ")
+        print(goal_bounds_min_puck_posx)
+
+        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx # | self.goal_bounds
         # print(out_of_bounds)
 
         time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -739,6 +777,7 @@ def compute_rewards(
     rew_scale_terminated: float,
     rew_scale_distance: float, 
     rew_scale_goal: float, 
+    rew_scale_timestep: float, 
     # rew_scale_pole_pos: float,
     # rew_scale_cart_vel: float,
     # rew_scale_pole_vel: float,
@@ -749,8 +788,11 @@ def compute_rewards(
     curr_cuboidpuck2_state: torch.Tensor,  
     reset_terminated: torch.Tensor,
     goal_location: float, 
-    max_goal_posx: float, 
-    min_goal_posx: float, 
+    # max_goal_posx: float, 
+    # min_goal_posx: float, 
+    goal_bounds: torch.Tensor, 
+    episode_length_buf: torch.Tensor,
+    max_episode_length: float, 
 ):
     # print("Env compute rewards called!!!!")
     # print(max_goal_posx)
@@ -762,15 +804,17 @@ def compute_rewards(
     # distance_to_goal = torch.abs(curr_cuboidpuck2_state - goal_x_positions)
     rew_distance = rew_scale_distance * (1.0 - torch.abs(curr_cuboidpuck2_state - goal_location))
 
+    rew_timestep = rew_scale_timestep * (1.0-(episode_length_buf/max_episode_length))
+
     # Check for Puck reaches goal (i.e., in goal region)
     # print("Check goal conditoinnnnnnn")
     # print(max_goal_posx)
     # print(min_goal_posx)
-    goal_bounds_max_puck_posx = curr_cuboidpuck2_state > max_goal_posx
-    goal_bounds_min_puck_posx = curr_cuboidpuck2_state < min_goal_posx
+    # goal_bounds_max_puck_posx = curr_cuboidpuck2_state > max_goal_posx
+    # goal_bounds_min_puck_posx = curr_cuboidpuck2_state < min_goal_posx
 
-    goal_bounds = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
-    rew_goal = rew_scale_goal * goal_bounds
+    # goal_bounds = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
+    rew_goal = rew_scale_goal * goal_bounds.int()
     # print(goal_bounds)
 
 
@@ -780,7 +824,7 @@ def compute_rewards(
     # total_reward = rew_alive + rew_termination + rew_pole_pos + rew_cart_vel + rew_pole_vel
     # total_reward = rew_alive + rew_termination 
     # total_reward = rew_alive + rew_termination + rew_goal
-    total_reward = rew_goal + rew_termination + rew_distance
+    total_reward = rew_goal + rew_termination + rew_distance + rew_timestep
     # print(rew_distance)
     # print(curr_cuboidpuck2_state)
     # print(goal_location)
@@ -788,3 +832,39 @@ def compute_rewards(
     return total_reward
     # print(total_reward)
     # pass
+
+# @configclass
+# class EventCfg:
+#   robot_physics_material = EventTerm(
+#       func=mdp.randomize_rigid_body_material,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+#           "static_friction_range": (0.7, 1.3),
+#           "dynamic_friction_range": (1.0, 1.0),
+#           "restitution_range": (1.0, 1.0),
+#           "num_buckets": 250,
+#       },
+#   )
+#   robot_joint_stiffness_and_damping = EventTerm(
+#       func=mdp.randomize_actuator_gains,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+#           "stiffness_distribution_params": (0.75, 1.5),
+#           "damping_distribution_params": (0.3, 3.0),
+#           "operation": "scale",
+#           "distribution": "log_uniform",
+#       },
+#   )
+#   reset_gravity = EventTerm(
+#       func=mdp.randomize_physics_scene_gravity,
+#       mode="interval",
+#       is_global_time=True,
+#       interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
+#       params={
+#           "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
+#           "operation": "add",
+#           "distribution": "gaussian",
+#       },
+#   )

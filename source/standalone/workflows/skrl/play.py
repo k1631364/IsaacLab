@@ -41,7 +41,7 @@ import gymnasium as gym
 import os
 import torch
 
-from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
+from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG, PPO_RNN
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
 
 import omni.isaac.lab_tasks  # noqa: F401
@@ -105,7 +105,7 @@ def main():
     agent_cfg["experiment"]["write_interval"] = 0  # don't log to Tensorboard
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
-    agent = PPO(
+    agent = PPO_RNN(
         models=models,
         memory=None,  # memory is optional during evaluation
         cfg=agent_cfg,
