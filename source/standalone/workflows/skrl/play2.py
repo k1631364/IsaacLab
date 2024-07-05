@@ -131,6 +131,22 @@ def main():
     # set agent to evaluation mode
     agent.set_running_mode("eval")
 
+    # # set default values
+    # import copy
+    # wandb_kwargs = copy.deepcopy(experiment_cfg)
+    # wandb_kwargs.setdefault("name", os.path.split(log_root_path)[-1])
+    # wandb_kwargs.setdefault("sync_tensorboard", True)
+    # wandb_kwargs.setdefault("config", {})
+
+    # init Weights & Biases
+    import wandb
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project="",
+        # Track hyperparameters and run metadata
+        config={},
+    )
+
     # reset environment
     obs, infos = env.reset()
     # simulate environment
@@ -140,7 +156,7 @@ def main():
             # agent stepping
             actions = agent.act(obs, timestep=0, timesteps=0)[0]
             # env stepping
-            obs, _, _, _, _ = env.step(actions)
+            obs, _, _, _, infos = env.step(actions)
 
             # infos["log"] = {"tttt": torch.tensor(3.14)}
             # print(infos)
@@ -150,6 +166,8 @@ def main():
             #             agent.track_data(f"EpisodeInfo / {k}", v.item())
             
             # agent.write_tracking_data()
+            print(infos["log"]["success_rate"])
+            wandb.log({"success_rate": infos["log"]["success_rate"]})
 
     # close the simulator
     env.close()

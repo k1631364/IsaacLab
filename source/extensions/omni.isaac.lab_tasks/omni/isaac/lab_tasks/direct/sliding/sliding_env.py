@@ -36,11 +36,49 @@ from omni.isaac.lab.managers import SceneEntityCfg
 import numpy as np
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 
+@configclass
+class EventCfg:
+  robot_physics_material = EventTerm(
+      func=mdp.randomize_rigid_body_material,
+      mode="reset",
+      params={
+          "asset_cfg": SceneEntityCfg("cuboidpuck2"),
+          "static_friction_range": (0.1, 0.1),
+          "dynamic_friction_range": (0.1, 0.1),
+          "restitution_range": (1.0, 1.0),
+          "num_buckets": 250,
+      },
+  )
+#   robot_joint_stiffness_and_damping = EventTerm(
+#       func=mdp.randomize_actuator_gains,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+#           "stiffness_distribution_params": (0.75, 1.5),
+#           "damping_distribution_params": (0.3, 3.0),
+#           "operation": "scale",
+#           "distribution": "log_uniform",
+#       },
+#   )
+#   reset_gravity = EventTerm(
+#       func=mdp.randomize_physics_scene_gravity,
+#       mode="interval",
+#       is_global_time=True,
+#       interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
+#       params={
+#           "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
+#           "operation": "add",
+#           "distribution": "gaussian",
+#       },
+#   )
+
 
 @configclass
 class SlidingEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
+
+    events: EventCfg = EventCfg()
 
     # # robot
     # robot_cfg: ArticulationCfg = CARTPOLE_CFG.replace(prim_path="/World/envs/env_.*/Robot")
@@ -436,6 +474,7 @@ class SlidingEnv(DirectRLEnv):
         new_linvel = new_linvel.to(self.scene.env_origins.device)
         # new_linvel[:,0] = new_linvel[:,0]-0.2
         xvel = self.actions[:,0]
+        # xvel = -0.2
         new_linvel[:,0] = new_linvel[:,0]+xvel
         new_angvel = torch.zeros((self.scene.num_envs, 3))
         new_angvel = new_angvel.to(self.scene.env_origins.device)
@@ -863,38 +902,3 @@ def compute_rewards(
     # print(total_reward)
     # pass
 
-# @configclass
-# class EventCfg:
-#   robot_physics_material = EventTerm(
-#       func=mdp.randomize_rigid_body_material,
-#       mode="reset",
-#       params={
-#           "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-#           "static_friction_range": (0.7, 1.3),
-#           "dynamic_friction_range": (1.0, 1.0),
-#           "restitution_range": (1.0, 1.0),
-#           "num_buckets": 250,
-#       },
-#   )
-#   robot_joint_stiffness_and_damping = EventTerm(
-#       func=mdp.randomize_actuator_gains,
-#       mode="reset",
-#       params={
-#           "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-#           "stiffness_distribution_params": (0.75, 1.5),
-#           "damping_distribution_params": (0.3, 3.0),
-#           "operation": "scale",
-#           "distribution": "log_uniform",
-#       },
-#   )
-#   reset_gravity = EventTerm(
-#       func=mdp.randomize_physics_scene_gravity,
-#       mode="interval",
-#       is_global_time=True,
-#       interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
-#       params={
-#           "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
-#           "operation": "add",
-#           "distribution": "gaussian",
-#       },
-#   )
