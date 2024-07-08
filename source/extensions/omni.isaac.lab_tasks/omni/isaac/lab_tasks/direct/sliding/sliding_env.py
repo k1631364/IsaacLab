@@ -318,7 +318,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # action_scale = 100.0  # [N]
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 3
+    num_observations = 5
     num_states = 2
 
     # # reset
@@ -515,7 +515,7 @@ class SlidingEnv(DirectRLEnv):
         goal_tensor = torch.full((self.scene.env_origins.shape[0],), self.cfg.goal_location, device=self.device)
 
         # obs = curr_cuboidpusher2_state[:,0]
-        obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], goal_tensor), dim=1)
+        obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], goal_tensor), dim=1)
 
         observations = {"policy": obs}
         # print("Printing observations!!!!")
@@ -707,7 +707,7 @@ class SlidingEnv(DirectRLEnv):
         # print(self.goal_bounds)
 
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx # | self.goal_bounds
-        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds
+        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds | out_of_bounds_min_puck_velx
 
         # print(out_of_bounds)
 
@@ -733,7 +733,7 @@ class SlidingEnv(DirectRLEnv):
         # return true_tensor, true_tensor
         # print(self.cuboidpusher2_state[0,0])
 
-        episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out
+        episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
 
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | self.goal_bounds
         return out_of_bounds, time_out, self.goal_bounds, episode_failed

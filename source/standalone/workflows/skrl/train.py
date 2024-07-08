@@ -179,6 +179,8 @@ def main():
     trainer_cfg = experiment_cfg["trainer"]
     trainer = SkrlSequentialLogTrainer(cfg=trainer_cfg, env=env, agents=agent)
 
+    print("Before expeirmnet start!!!!!!!!!!!!!!!!!!!!!!!")
+
     # train the agent
     trainer.train()
     
