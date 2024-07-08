@@ -204,11 +204,11 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     ) 
 
     # Goal
-    goal_location = -0.45  # the cart is reset if it exceeds that position [m]
+    goal_location = -0.75  # the cart is reset if it exceeds that position [m]
     gaol_length = 0.5
     max_goal_posx = (goal_location-(gaol_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
     min_goal_posx = goal_location+(gaol_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
-    max_puck_goalcount = 20
+    max_puck_goalcount = 5
 
     markergoal1_cfg = VisualizationMarkersCfg(
         prim_path="/Visual/Goal1",
@@ -318,7 +318,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # action_scale = 100.0  # [N]
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 2
+    num_observations = 3
     num_states = 2
 
     # # reset
@@ -339,10 +339,10 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     rew_scale_alive = 1.0
     # rew_scale_terminated = -2.0
     rew_scale_terminated = -70.0
-    rew_scale_distance = 0.01
+    rew_scale_distance = 0.1
     rew_scale_goal = 100.0
     rew_scale_timestep = 0.01
-    rew_scale_pushervel = 1.0
+    rew_scale_pushervel = 0.1
     # rew_scale_pole_pos = -1.0
     # rew_scale_cart_vel = -0.01
     # rew_scale_pole_vel = -0.005
@@ -380,6 +380,9 @@ class SlidingEnv(DirectRLEnv):
         self.out_of_bounds_goal_puck_posx_count = self.out_of_bounds_goal_puck_posx_count.to(self.scene.env_origins.device)
 
         self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
+
+        self.prev_puck_vel = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
+        self.prev_puck_acc = torch.zeros_like(self.prev_puck_vel)
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -508,8 +511,11 @@ class SlidingEnv(DirectRLEnv):
         # curr_cuboidpuck2_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[:, 7:])
         # print(curr_cuboidpuck2_state[0,0])
 
+        # Goal
+        goal_tensor = torch.full((self.scene.env_origins.shape[0],), self.cfg.goal_location, device=self.device)
+
         # obs = curr_cuboidpusher2_state[:,0]
-        obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0]), dim=1)
+        obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], goal_tensor), dim=1)
 
         observations = {"policy": obs}
         # print("Printing observations!!!!")
@@ -549,6 +555,19 @@ class SlidingEnv(DirectRLEnv):
             curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
         )
 
+        # print("Pusher vel")
+        physics_time_step = 1 / 120
+        control_dt = self.cfg.decimation * physics_time_step
+        # print(curr_cuboidpusher2_state[:, 7].shape)
+        # print(control_dt)
+        # Acceleration
+        acc = (curr_cuboidpusher2_state[:, 7]-self.prev_puck_vel)/control_dt
+        self.prev_puck_vel = curr_cuboidpusher2_state[:, 7]
+
+        jerk = (acc-self.prev_puck_acc)/control_dt
+        self.prev_puck_acc = acc
+        # print(jerk)
+
         # print(curr_cuboidpusher2_state[:,7])
 
         # print("Pusher velocity!!!!!!!!")
@@ -579,8 +598,8 @@ class SlidingEnv(DirectRLEnv):
             # self.joint_pos[:, self._cart_dof_idx[0]],
             # self.joint_vel[:, self._cart_dof_idx[0]],
             curr_cuboidpuck2_state[:,0], 
-            curr_cuboidpusher2_state[:,7], 
-            self.reset_terminated,
+            jerk, 
+            self.episode_failed,
             self.cfg.goal_location, 
             # self.cfg.max_goal_posx,
             # self.cfg.min_goal_posx,
@@ -677,13 +696,10 @@ class SlidingEnv(DirectRLEnv):
         curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
         self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
 
-        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>=self.cfg.max_puck_goalcount
+        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
-        # print("Goallllll")
-        # if self.goal_bounds[0]:
-        #     print(self.goal_bounds)
 
         # print("chekcing puck goal ")
         # print(self.out_of_bounds_goal_puck_posx_count)
@@ -691,7 +707,7 @@ class SlidingEnv(DirectRLEnv):
         # print(self.goal_bounds)
 
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | out_of_bounds_min_puck_velx | overshoot_max_puck_posx # | self.goal_bounds
-        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | self.goal_bounds
+        out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds
 
         # print(out_of_bounds)
 
@@ -717,8 +733,9 @@ class SlidingEnv(DirectRLEnv):
         # return true_tensor, true_tensor
         # print(self.cuboidpusher2_state[0,0])
 
-        episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | time_out
+        episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out
 
+        # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx # | self.goal_bounds
         return out_of_bounds, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
@@ -850,7 +867,7 @@ def compute_rewards(
     # cart_pos: torch.Tensor,
     # cart_vel: torch.Tensor,
     curr_cuboidpuck2_state: torch.Tensor,  
-    curr_cuboidpusher2_state: torch.Tensor,  
+    jerk: torch.Tensor,  
     reset_terminated: torch.Tensor,
     goal_location: float, 
     # max_goal_posx: float, 
@@ -882,7 +899,7 @@ def compute_rewards(
     rew_goal = rew_scale_goal * goal_bounds.int()
     # print(goal_bounds)
 
-    normalized_pushervel = torch.abs(curr_cuboidpusher2_state) / 3.0
+    normalized_pushervel = torch.abs(jerk) / 4000.0
     rew_pushervel = rew_scale_pushervel * (1.0-normalized_pushervel)
     # print(rew_pushervel)
 
@@ -893,7 +910,7 @@ def compute_rewards(
     # total_reward = rew_alive + rew_termination + rew_pole_pos + rew_cart_vel + rew_pole_vel
     # total_reward = rew_alive + rew_termination 
     # total_reward = rew_alive + rew_termination + rew_goal
-    total_reward = rew_goal + rew_termination + rew_distance # + rew_pushervel + rew_timestep
+    total_reward = rew_goal + rew_termination + rew_distance # + rew_pushervel # + rew_timestep
     # print(rew_distance)
     # print(curr_cuboidpuck2_state)
     # print(goal_location)

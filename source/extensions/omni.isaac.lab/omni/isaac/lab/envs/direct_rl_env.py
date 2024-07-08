@@ -155,6 +155,8 @@ class DirectRLEnv(gym.Env):
         self.goal_reached = torch.zeros_like(self.reset_terminated)
         self.episode_failed = torch.zeros_like(self.reset_terminated)
         self.success_record = torch.zeros_like(self.reset_terminated)
+        self.num_success = 0
+        self.num_failure = 0
         self.reset_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.sim.device)
         self.actions = torch.zeros(self.num_envs, self.cfg.num_actions, device=self.sim.device)
         # setup the action and observation spaces for Gym
@@ -322,6 +324,14 @@ class DirectRLEnv(gym.Env):
         # Update record_tensor based on success_tensor and failed_tensor
         self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
         self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
+
+        # print(success_tensor.shape)
+        if success_tensor[0]==True:
+            self.num_success+=1
+        if failed_tensor[0]==True:
+            self.num_failure+=1
+        self.extras["log_eval"] = {"num_success": self.num_success, 
+                                   "num_failure": self.num_failure}
 
         # print(self.success_record.int())
 

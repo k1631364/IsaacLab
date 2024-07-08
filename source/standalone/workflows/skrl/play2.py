@@ -149,6 +149,7 @@ def main():
 
     # reset environment
     obs, infos = env.reset()
+    prev_total_episode_num = 0
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -166,8 +167,25 @@ def main():
             #             agent.track_data(f"EpisodeInfo / {k}", v.item())
             
             # agent.write_tracking_data()
-            print(infos["log"]["success_rate"])
-            wandb.log({"success_rate": infos["log"]["success_rate"]})
+            # print(infos["log"]["success_rate"])
+            # wandb.log({"success_rate": infos["log"]["success_rate"]})
+
+            total_episode_num = infos["log_eval"]["num_success"]+infos["log_eval"]["num_failure"]
+            
+            if total_episode_num!=0 and prev_total_episode_num!=total_episode_num:
+                success_rate_1env = (infos["log_eval"]["num_success"]/(infos["log_eval"]["num_success"]+infos["log_eval"]["num_failure"]))*100.0
+                print("Success num")
+                print(total_episode_num)
+                print(infos["log_eval"]["num_success"])
+                print(infos["log_eval"]["num_failure"])
+                print(success_rate_1env)
+                # wandb.log({"Episode_num": total_episode_num})  
+                # wandb.log({"success_rate": success_rate_1env}) 
+                wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env})
+                prev_total_episode_num = total_episode_num 
+
+
+
 
     # close the simulator
     env.close()
