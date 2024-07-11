@@ -44,7 +44,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
           "static_friction_range": (0.1, 0.1),
-          "dynamic_friction_range": (0.1, 0.1),
+          "dynamic_friction_range": (0.1, 0.8),
           "restitution_range": (1.0, 1.0),
           "num_buckets": 250,
       },
@@ -204,17 +204,17 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     ) 
 
     # Goal
-    goal_location = -0.75  # the cart is reset if it exceeds that position [m]
-    gaol_length = 0.5
-    max_goal_posx = (goal_location-(gaol_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
-    min_goal_posx = goal_location+(gaol_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+    goal_location = -0.25  # the cart is reset if it exceeds that position [m]
+    goal_length = 0.5
+    max_goal_posx = (goal_location-(goal_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
+    min_goal_posx = goal_location+(goal_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
     max_puck_goalcount = 5
 
     markergoal1_cfg = VisualizationMarkersCfg(
         prim_path="/Visual/Goal1",
         markers={
             "cube": sim_utils.CuboidCfg(
-                size=(gaol_length, 1.0, 0.01),
+                size=(goal_length, 1.0, 0.01),
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
             ),
         },
@@ -314,7 +314,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # control_frequency = 1 / (decimation_rate * physics_time_step) lower control freq like 30Hz leads to more stable learning
     # See /workspace/isaaclab/source/extensions/omni.isaac.lab/omni/isaac/lab/envs/rl_env_cfg.py for more details
     decimation = 5
-    episode_length_s = 5.0
+    episode_length_s = 2.0
     # action_scale = 100.0  # [N]
     action_scale = 1.0
     num_actions = 1 # action dim
@@ -327,11 +327,11 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     max_puck_posx = 0.9  # the cart is reset if it exceeds that position [m]
     min_puck_posx = -0.95  # the cart is reset if it exceeds that position [m]
     min_puck_velx = 0.01
-    max_puck_restcount = 30
+    max_puck_restcount = 10
     # goal_location = -0.85  # the cart is reset if it exceeds that position [m]
-    # gaol_length = 0.3
-    # max_goal_posx = goal_location-(gaol_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
-    # min_goal_posx = goal_location+(gaol_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+    # goal_length = 0.3
+    # max_goal_posx = goal_location-(goal_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
+    # min_goal_posx = goal_location+(goal_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
     # max_cart_pos = 3.0  # the cart is reset if it exceeds that position [m]
     # initial_pole_angle_range = [-0.25, 0.25]  # the range in which the pole angle is sampled from on reset [rad]
 
@@ -340,7 +340,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # rew_scale_terminated = -2.0
     rew_scale_terminated = -70.0
     rew_scale_distance = 0.1
-    rew_scale_goal = 100.0
+    rew_scale_goal = 500.0
     rew_scale_timestep = 0.01
     rew_scale_pushervel = 0.1
     # rew_scale_pole_pos = -1.0
@@ -383,6 +383,25 @@ class SlidingEnv(DirectRLEnv):
 
         self.prev_puck_vel = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
         self.prev_puck_acc = torch.zeros_like(self.prev_puck_vel)
+        
+        init_goal_location = torch.tensor([self.cfg.goal_location, 0.0, 1.0], device=self.scene.env_origins.device)
+        self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
+        self.goal_location_normmax = -0.75
+        self.goal_location_normmin = -0.25
+        self.goal_location_max = -0.35
+        self.goal_location_min = -0.35
+        self.object_location_normmax = -0.95
+        self.object_location_normmin = 0.9
+        # self.goal_locations = torch.full((self.scene.env_origins.shape[0],3), self.cfg.goal_location, device=self.device)
+        self.success_rates = []
+
+        # goal_location = -0.75  # the cart is reset if it exceeds that position [m]
+        # goal_length = 0.5
+        # max_goal_posx = (goal_location-(goal_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
+        # min_goal_posx = goal_location+(goal_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+        # max_puck_goalcount = 5
+        self.maxgoal_locations = (self.goal_locations[:,0]-(self.cfg.goal_length/2.0))+(self.cfg.puck_length/2.0)
+        self.mingoal_locations = self.goal_locations[:,0]+(self.cfg.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -512,10 +531,33 @@ class SlidingEnv(DirectRLEnv):
         # print(curr_cuboidpuck2_state[0,0])
 
         # Goal
+        # print("Goal randomisatoin")
+        # print(self.goal_locations[0,])
+        # print(self.goal_locations[21,])
         goal_tensor = torch.full((self.scene.env_origins.shape[0],), self.cfg.goal_location, device=self.device)
+        goal_tensor = self.goal_locations[:,0].clone()
+        normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
+        # print(self.goal_locations[21,])
+        # print(self.goal_locations[21,0])
+        # print(goal_tensor[21])
+
+        # Friction
+        # print(self.scene.rigid_objects["cuboidpuck2"].root_physx_view.get_material_properties().shape)
+        curr_materials = self.scene.rigid_objects["cuboidpuck2"].root_physx_view.get_material_properties()
+        # print(curr_materials.squeeze().shape)
+        static_frictions = curr_materials.squeeze().reshape((-1,3))[:,0].to(self.scene.env_origins.device)
+        dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
+        restitutions = curr_materials.squeeze().reshape((-1,3))[:,2].to(self.scene.env_origins.device)
+
+        
 
         # obs = curr_cuboidpusher2_state[:,0]
-        obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], goal_tensor), dim=1)
+        normalized_pusherpos = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        normalized_puckpos = (curr_cuboidpuck2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        normalized_pushervel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        normalized_puckvel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], normalized_goal_tensor), dim=1)
+        obs = torch.stack((normalized_pusherpos, normalized_puckpos, curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], normalized_goal_tensor), dim=1)
 
         observations = {"policy": obs}
         # print("Printing observations!!!!")
@@ -690,8 +732,16 @@ class SlidingEnv(DirectRLEnv):
         #     self.consecutive_steps_count = 0
 
         # Check if it reaches the goal
-        goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx    # becomes false if overshoot
-        goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.min_goal_posx    # becomes true once in goal region
+        # goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.cfg.max_goal_posx    # becomes false if overshoot
+        # goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.cfg.min_goal_posx    # becomes true once in goal region
+        goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] > self.maxgoal_locations    # becomes false if overshoot
+        goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] < self.mingoal_locations    # becomes true once in goal region
+        # print(curr_cuboidpuck2_state[:,0] < self.mingoal_locations)
+        # print(curr_cuboidpuck2_state[:,0])
+        # print(self.mingoal_locations)
+
+        # print(self.goal_locations[21,0])
+        # print(goal_tensor[21])
 
         curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
         self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
@@ -811,6 +861,40 @@ class SlidingEnv(DirectRLEnv):
         # self.cuboidpuck2.write_root_state_to_sim(object_default_state, env_ids)
 
         # reset object
+        # print("Success rate")
+        # curr_success_rate = self.extras.get('log')
+        # if curr_success_rate is not None: 
+        #     print(curr_success_rate["success_rate"])
+        #     self.success_rates.append(curr_success_rate["success_rate"].item())
+        #     successrate_changes = np.sum(np.diff(np.array(self.success_rates[-100:])))
+        #     print(successrate_changes)
+        #     if np.abs(successrate_changes)<0.0003 and curr_success_rate["success_rate"] > 0.9 and self.goal_location_max>=self.goal_location_normmax:
+        #         self.goal_location_max -= 0.05
+        #         print(self.goal_location_max)
+        # discrete_values = torch.tensor([-0.35, -0.55], device=self.device)
+        # random_indices = torch.randint(len(discrete_values), size=(len(env_ids),), device=self.device)
+        # goal_noise = discrete_values[random_indices]
+        goal_noise = sample_uniform(self.goal_location_max, self.goal_location_min, (len(env_ids)), device=self.device)
+        goal_pos_offset = self.goal_locations.clone()
+        goal_pos_offset[env_ids, 0] = goal_noise
+        # print("Goal noise")
+        # print(self.goal_locations[0,])
+        # print(self.goal_locations[21,])
+        # print(goal_pos_offset[0,])
+        # print(goal_pos_offset[21,])
+        self.goal_locations = goal_pos_offset.clone()
+        self.maxgoal_locations = (self.goal_locations[:,0]-(self.cfg.goal_length/2.0))+(self.cfg.puck_length/2.0)
+        self.mingoal_locations = self.goal_locations[:,0]+(self.cfg.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+        # # goal_pos_offset[env_ids, 2] = 1.0
+        goal_pos_offset = goal_pos_offset.to(self.scene.env_origins.device)
+        goal_pos = self.scene.env_origins + goal_pos_offset
+        goal_pos = goal_pos.to(self.scene.env_origins.device)
+        goal_rot = torch.zeros((self.scene.env_origins.shape[0], 4))
+        goal_rot = goal_rot.to(self.scene.env_origins.device)
+        self.marker1.visualize(goal_pos, goal_rot) 
+        # self.goal_locations = goal_pos
+
+        # reset object
         cuboidpuck2_default_state = self.cuboidpuck2.data.default_root_state.clone()[env_ids]
         pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
         # global object positions
@@ -918,4 +1002,3 @@ def compute_rewards(
     return total_reward
     # print(total_reward)
     # pass
-
