@@ -22,6 +22,7 @@ from omni.isaac.lab.utils.math import sample_uniform
 
 from omni.isaac.lab.assets import RigidObject, RigidObjectCfg
 from omni.isaac.lab.markers import VisualizationMarkers, VisualizationMarkersCfg
+from omni.isaac.lab.sensors import ContactSensor, ContactSensorCfg, RayCaster, RayCasterCfg, patterns
 
 from omni.isaac.lab.managers import EventTermCfg as EventTerm
 import omni.isaac.lab.envs.mdp as mdp
@@ -44,7 +45,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
           "static_friction_range": (0.1, 0.1),
-          "dynamic_friction_range": (0.1, 0.8),
+          "dynamic_friction_range": (0.1, 0.9),
           "restitution_range": (1.0, 1.0),
           "num_buckets": 250,
       },
@@ -99,44 +100,19 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     #     init_state=RigidObjectCfg.InitialStateCfg(),
     # )
 
-    cuboidtable_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/Table",
-        spawn=sim_utils.CuboidCfg(
-            size = [2.0, 1.0, 1.0], 
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=30.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.68, 0.85, 0.9), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.5), rot=(0.0, 0.0, 0.0, 0.0)),
-    )    
-
-
-    cuboidpuck_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/Puck",
-        spawn=sim_utils.CuboidCfg(
-            size = [0.1, 0.2, 0.1], 
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.6, 0.0, 1.05), rot=(0.0, 0.0, 0.0, 0.0)),
-    ) 
-
-    object_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/object",
-        spawn=sim_utils.CuboidCfg(
-            size = [0.1, 0.2, 0.05], 
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.6, 0.0, 1.05), rot=(1.0, 0.0, 0.0, 0.0)),
-    )
-    # reset
-    reset_position_noise = 0.01  # range of position at reset
+    # object_cfg: RigidObjectCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/object",
+    #     spawn=sim_utils.CuboidCfg(
+    #         size = [0.1, 0.2, 0.05], 
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(0.6, 0.0, 1.05), rot=(1.0, 0.0, 0.0, 0.0)),
+    # )
+    # # reset
+    # reset_position_noise = 0.01  # range of position at reset
 
     # Puck
     puck_length = 0.1
@@ -147,6 +123,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
             collision_props=sim_utils.CollisionPropertiesCfg(),
+            activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.6, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
@@ -161,54 +138,44 @@ class SlidingEnvCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
             collision_props=sim_utils.CollisionPropertiesCfg(),
+            activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.9, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.7, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
+    table_length = 2.0
     cuboidtable2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidtable2",
         spawn=sim_utils.CuboidCfg(
-            size = [2.0, 1.0, 1.0], 
+            size = [table_length, 1.0, 1.0], 
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=30.0),
             collision_props=sim_utils.CollisionPropertiesCfg(),
+            activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.68, 0.85, 0.9), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.5), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
-
-    spherepusher_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/Pusher",
-        spawn=sim_utils.SphereCfg(
-            radius = 0.025, 
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.8, 0.0, 1.0625), rot=(0.0, 0.0, 0.0, 0.0)),
-    ) 
-
-    cuboidpusher_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/CuboidPusher",
-        spawn=sim_utils.CuboidCfg(
-            size = [0.1, 0.2, 0.05], 
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.7, 0.0, 1.075), rot=(0.0, 0.0, 0.0, 0.0)),
-    ) 
+    # spherepusher_cfg: RigidObjectCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/Pusher",
+    #     spawn=sim_utils.SphereCfg(
+    #         radius = 0.025, 
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(0.8, 0.0, 1.0625), rot=(0.0, 0.0, 0.0, 0.0)),
+    # ) 
 
     # Goal
     goal_location = -0.25  # the cart is reset if it exceeds that position [m]
     goal_length = 0.5
     max_goal_posx = (goal_location-(goal_length/2.0))+(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-1.0)
     min_goal_posx = goal_location+(goal_length/2.0)-(puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
-    max_puck_goalcount = 5
+    max_puck_goalcount = 10
 
     markergoal1_cfg = VisualizationMarkersCfg(
         prim_path="/Visual/Goal1",
@@ -247,61 +214,17 @@ class SlidingEnvCfg(DirectRLEnvCfg):
         },
     )
 
-    # object_cfg: RigidObjectCfg = RigidObjectCfg(
-    #     prim_path="/World/envs/env_.*/object",
-    #     spawn=sim_utils.UsdFileCfg(
-    #         # usd_path=f"Isaac/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-    #         usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-    #             kinematic_enabled=False,
-    #             disable_gravity=False,
-    #             enable_gyroscopic_forces=True,
-    #             solver_position_iteration_count=8,
-    #             solver_velocity_iteration_count=0,
-    #             sleep_threshold=0.005,
-    #             stabilization_threshold=0.0025,
-    #             max_depenetration_velocity=1000.0,
-    #         ),
-    #         mass_props=sim_utils.MassPropertiesCfg(density=567.0),
-    #     ),
-    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -0.39, 0.6), rot=(1.0, 0.0, 0.0, 0.0)),
+    # contact_sensor_cfg: ContactSensorCfg = ContactSensorCfg(
+    #     prim_path="/World/envs/env_.*/cuboidpusher2/",
     # )
 
-    # # Rigid Object
-    # cone_cfg = RigidObjectCfg(
-    #     # prim_path="/World/Origin.*/Cone",
-    #     prim_path="/World/envs/env_.*/object",
-    #     spawn=sim_utils.ConeCfg(
-    #         radius=0.1,
-    #         height=0.2,
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-    #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-    #         collision_props=sim_utils.CollisionPropertiesCfg(),
-    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
-    #     ),
-    #     init_state=RigidObjectCfg.InitialStateCfg(),
-    # )
-
-    # # Rigid Object
-    # box_cfg = RigidObjectCfg(
-    #     # prim_path="/World/Origin.*/Cone",
-    #     prim_path="/World/envs/env_.*/Table",
-    #     spawn=sim_utils.CuboidCfg(
-    #         size = [0.1, 0.2, 0.1], 
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-    #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-    #         collision_props=sim_utils.CollisionPropertiesCfg(),
-    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
-    #     ),
-    #     # spawn=sim_utils.ConeCfg(
-    #     #     radius=0.1,
-    #     #     height=0.2,
-    #     #     rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-    #     #     mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-    #     #     collision_props=sim_utils.CollisionPropertiesCfg(),
-    #     #     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
-    #     # ),
-    #     init_state=RigidObjectCfg.InitialStateCfg(),
+    # height_scanner = RayCasterCfg(
+    #     prim_path="/World/envs/env_.*/cuboidpusher2",
+    #     offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+    #     attach_yaw_only=True,
+    #     pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+    #     debug_vis=False,
+    #     mesh_prim_paths=["/World/ground"],
     # )
 
     # scene
@@ -318,7 +241,7 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # action_scale = 100.0  # [N]
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 5
+    num_observations = 6
     num_states = 2
 
     # # reset
@@ -338,14 +261,23 @@ class SlidingEnvCfg(DirectRLEnvCfg):
     # # reward scales
     rew_scale_alive = 1.0
     # rew_scale_terminated = -2.0
-    rew_scale_terminated = -70.0
-    rew_scale_distance = 0.1
-    rew_scale_goal = 500.0
-    rew_scale_timestep = 0.01
-    rew_scale_pushervel = 0.1
+    rew_scale_terminated = -7.0
+    rew_scale_distance = 0.05
+    rew_scale_goal = 50.0
+    rew_scale_timestep = 0.001
+    rew_scale_pushervel = -0.01
     # rew_scale_pole_pos = -1.0
     # rew_scale_cart_vel = -0.01
     # rew_scale_pole_vel = -0.005
+
+    ### working rewards ###
+    # # reward scales
+    # rew_scale_alive = 1.0
+    # rew_scale_terminated = -70.0
+    # rew_scale_distance = 0.1
+    # rew_scale_goal = 500.0
+    # rew_scale_timestep = 0.01
+    # rew_scale_pushervel = 0.5
 
 class SlidingEnv(DirectRLEnv):
     cfg: SlidingEnvCfg
@@ -388,12 +320,18 @@ class SlidingEnv(DirectRLEnv):
         self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
         self.goal_location_normmax = -0.75
         self.goal_location_normmin = -0.25
-        self.goal_location_max = -0.35
-        self.goal_location_min = -0.35
+        self.goal_location_min = -0.55
+        self.goal_location_max = -0.55
         self.object_location_normmax = -0.95
         self.object_location_normmin = 0.9
+        self.object_vel_normmax = -4.0
+        self.object_vel_normmin = 4.0
         # self.goal_locations = torch.full((self.scene.env_origins.shape[0],3), self.cfg.goal_location, device=self.device)
         self.success_rates = []
+
+        # self.success_threshold = 0.25
+        # self.rew_scale_goal = self.cfg.rew_scale_goal
+        # self.rew_scale_distance = self.cfg.rew_scale_distance
 
         # goal_location = -0.75  # the cart is reset if it exceeds that position [m]
         # goal_length = 0.5
@@ -402,6 +340,14 @@ class SlidingEnv(DirectRLEnv):
         # max_puck_goalcount = 5
         self.maxgoal_locations = (self.goal_locations[:,0]-(self.cfg.goal_length/2.0))+(self.cfg.puck_length/2.0)
         self.mingoal_locations = self.goal_locations[:,0]+(self.cfg.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+
+        self.past_timestep = 1
+        self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        
+
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -438,6 +384,10 @@ class SlidingEnv(DirectRLEnv):
         goal_rot = torch.zeros((self.scene.env_origins.shape[0], 4))
         goal_rot = goal_rot.to(self.scene.env_origins.device)
         self.marker1.visualize(goal_pos, goal_rot) 
+
+        # self._height_scanner = RayCaster(self.cfg.height_scanner)
+        # self.scene.sensors["height_scanner"] = self._height_scanner
+        # print(self._height_scanner)
 
         # goal_pos_offset = torch.zeros((32, 3))
         # goal_pos_offset[:, 0] = -0.55
@@ -477,6 +427,13 @@ class SlidingEnv(DirectRLEnv):
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
+        
+        # self.contact_sensor = ContactSensor(self.cfg.contact_sensor_cfg)
+        # self.scene.sensors["contact_sensor"] = self.contact_sensor
+        # print(type(self.scene.sensors["contact_sensor"]))
+        # print(self.scene.sensors["contact_sensor"])
+        # print("Received max contact force of: ", torch.max(self.scene["contact_sensor"].data.net_forces_w).item())
+
         # env_ids = torch.arange(0, 32).to(self.scene.env_origins.device)
         # self._reset_idx(env_ids)
         
@@ -508,7 +465,7 @@ class SlidingEnv(DirectRLEnv):
     def _get_observations(self) -> dict:
         # print("Env get observations called!!!!")
         # print(self.cuboidpusher2_state[0,0])
-
+        
         curr_cuboidpusher2_state = self.cuboidpusher2_state.clone()
         # print(object_default_state.shape)
         # print(self.scene.env_origins.shape)
@@ -517,6 +474,14 @@ class SlidingEnv(DirectRLEnv):
         curr_cuboidpusher2_state[:, 0:3] = (
             curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
         )
+        self.past_pusher_pos = torch.cat((self.past_pusher_pos,  curr_cuboidpusher2_state[:, 0].reshape((-1,1))), dim=1)
+        past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
+        normalized_past_pusher_pos_obs = (past_pusher_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        
+        self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
+        past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
+        normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        
         # curr_cuboidpusher2_state[:, 7:] = torch.zeros_like(self.cuboidpusher2.data.default_root_state[:, 7:])
 
         curr_cuboidpuck2_state = self.cuboidpuck2_state.clone()
@@ -527,6 +492,14 @@ class SlidingEnv(DirectRLEnv):
         curr_cuboidpuck2_state[:, 0:3] = (
             curr_cuboidpuck2_state[:, 0:3] - self.scene.env_origins
         )
+        self.past_puck_pos = torch.cat((self.past_puck_pos,  curr_cuboidpuck2_state[:, 0].reshape((-1,1))), dim=1)
+        past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
+        normalized_past_puck_pos_obs = (past_puck_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        
+        self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cuboidpuck2_state[:, 7].reshape((-1,1))), dim=1)
+        past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
+        normalized_past_puck_vel_obs = (past_puck_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        
         # curr_cuboidpuck2_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[:, 7:])
         # print(curr_cuboidpuck2_state[0,0])
 
@@ -554,11 +527,18 @@ class SlidingEnv(DirectRLEnv):
         # obs = curr_cuboidpusher2_state[:,0]
         normalized_pusherpos = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
         normalized_puckpos = (curr_cuboidpuck2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        normalized_pushervel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        normalized_puckvel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # normalized_pushervel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # normalized_puckvel = (curr_cuboidpusher2_state[:,0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        
         # obs = torch.stack((curr_cuboidpusher2_state[:,0], curr_cuboidpuck2_state[:,0], curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], normalized_goal_tensor), dim=1)
-        obs = torch.stack((normalized_pusherpos, normalized_puckpos, curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], normalized_goal_tensor), dim=1)
-
+        # obs = torch.stack((normalized_pusherpos, normalized_puckpos, curr_cuboidpusher2_state[:,7], curr_cuboidpuck2_state[:,7], normalized_goal_tensor), dim=1)
+        # print("Shape check")
+        # print(past_pusher_pos_obs.shape)
+        # print(normalized_puckpos.shape)
+        # print(torch.stack((past_pusher_pos_obs,normalized_puckpos)))
+        obs = torch.cat((past_puck_pos_obs, past_pusher_pos_obs, past_puck_vel_obs, past_pusher_vel_obs, goal_tensor.view(-1, 1), dynamic_frictions.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_past_puck_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1, 1)), dim=1)
+        
         observations = {"policy": obs}
         # print("Printing observations!!!!")
         # print(observations['policy'][0])
@@ -597,6 +577,8 @@ class SlidingEnv(DirectRLEnv):
             curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
         )
 
+        normalised_curr_distance = torch.abs(curr_cuboidpuck2_state[:,0] - self.goal_locations[:,0])/self.cfg.table_length
+
         # print("Pusher vel")
         physics_time_step = 1 / 120
         control_dt = self.cfg.decimation * physics_time_step
@@ -604,10 +586,10 @@ class SlidingEnv(DirectRLEnv):
         # print(control_dt)
         # Acceleration
         acc = (curr_cuboidpusher2_state[:, 7]-self.prev_puck_vel)/control_dt
-        self.prev_puck_vel = curr_cuboidpusher2_state[:, 7]
+        self.prev_puck_vel = curr_cuboidpusher2_state[:, 7].clone()
 
         jerk = (acc-self.prev_puck_acc)/control_dt
-        self.prev_puck_acc = acc
+        self.prev_puck_acc = acc.clone()
         # print(jerk)
 
         # print(curr_cuboidpusher2_state[:,7])
@@ -625,6 +607,14 @@ class SlidingEnv(DirectRLEnv):
         # self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         # self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
+        # curr_success_rate = self.extras.get('log')
+        # if curr_success_rate is not None: 
+        #     # print(curr_success_rate["success_rate"])
+        #     if curr_success_rate["success_rate"] > self.success_threshold: 
+        #         # self.rew_scale_goal += 5
+        #         self.success_threshold += 0.5
+        #         self.rew_scale_distance -= 0.02
+
         total_reward = compute_rewards(
             self.cfg.rew_scale_alive,
             self.cfg.rew_scale_terminated,
@@ -639,10 +629,11 @@ class SlidingEnv(DirectRLEnv):
             # self.joint_vel[:, self._pole_dof_idx[0]],
             # self.joint_pos[:, self._cart_dof_idx[0]],
             # self.joint_vel[:, self._cart_dof_idx[0]],
+            normalised_curr_distance, 
             curr_cuboidpuck2_state[:,0], 
-            jerk, 
+            curr_cuboidpusher2_state[:, 7], 
             self.episode_failed,
-            self.cfg.goal_location, 
+            self.goal_locations, 
             # self.cfg.max_goal_posx,
             # self.cfg.min_goal_posx,
             self.goal_bounds, 
@@ -950,10 +941,11 @@ def compute_rewards(
     # pole_vel: torch.Tensor,
     # cart_pos: torch.Tensor,
     # cart_vel: torch.Tensor,
+    normalised_curr_distance: torch.Tensor,
     curr_cuboidpuck2_state: torch.Tensor,  
-    jerk: torch.Tensor,  
+    curr_vel: torch.Tensor,  
     reset_terminated: torch.Tensor,
-    goal_location: float, 
+    goal_location: torch.Tensor,
     # max_goal_posx: float, 
     # min_goal_posx: float, 
     goal_bounds: torch.Tensor, 
@@ -968,9 +960,10 @@ def compute_rewards(
     rew_alive = rew_scale_alive * (1.0 - reset_terminated.float())
     rew_termination = rew_scale_terminated * reset_terminated.float()
     # distance_to_goal = torch.abs(curr_cuboidpuck2_state - goal_x_positions)
-    rew_distance = rew_scale_distance * (1.0 - torch.abs(curr_cuboidpuck2_state - goal_location))
+    rew_distance = rew_scale_distance * (1.0 - normalised_curr_distance)
+    # rew_distance = rew_scale_distance * (1.0 - torch.abs(curr_cuboidpuck2_state - goal_location[:,0]))
 
-    rew_timestep = rew_scale_timestep * (1.0-(episode_length_buf/max_episode_length))
+    # rew_timestep = rew_scale_timestep * (1.0-(episode_length_buf/max_episode_length))
 
     # Check for Puck reaches goal (i.e., in goal region)
     # print("Check goal conditoinnnnnnn")
@@ -983,9 +976,15 @@ def compute_rewards(
     rew_goal = rew_scale_goal * goal_bounds.int()
     # print(goal_bounds)
 
-    normalized_pushervel = torch.abs(jerk) / 4000.0
-    rew_pushervel = rew_scale_pushervel * (1.0-normalized_pushervel)
+    # normalized_pushervel = torch.abs(jerk) / 4000.0
+    # normalized_pushervel = torch.abs(acc) / 10.0
+    normalized_pushervel = torch.abs(curr_vel) / 10.0
+    modified_tensor = torch.where(normalized_pushervel < 0.01, torch.tensor(1.0), torch.tensor(0.0))
+    rew_pushervel = rew_scale_pushervel * normalized_pushervel
+    rew_pushervel0 = 0.05 * modified_tensor
     # print(rew_pushervel)
+
+
 
 
     # rew_pole_pos = rew_scale_pole_pos * torch.sum(torch.square(pole_pos).unsqueeze(dim=1), dim=-1)
@@ -994,7 +993,7 @@ def compute_rewards(
     # total_reward = rew_alive + rew_termination + rew_pole_pos + rew_cart_vel + rew_pole_vel
     # total_reward = rew_alive + rew_termination 
     # total_reward = rew_alive + rew_termination + rew_goal
-    total_reward = rew_goal + rew_termination + rew_distance # + rew_pushervel # + rew_timestep
+    total_reward = rew_goal + rew_termination + rew_distance + rew_pushervel # + rew_pushervel0 # + rew_timestep
     # print(rew_distance)
     # print(curr_cuboidpuck2_state)
     # print(goal_location)
