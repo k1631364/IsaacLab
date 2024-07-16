@@ -38,8 +38,8 @@ class EventCfg:
       mode="reset",
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
-          "static_friction_range": (0.1, 0.1),
-          "dynamic_friction_range": (0.1, 0.1),
+          "static_friction_range": (0.05, 0.05),
+          "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
           "num_buckets": 250,
       },
@@ -69,7 +69,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.1
-    puck_default_pos = 1.2
+    puck_default_pos = 1.3
     cuboidpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpuck2",
         spawn=sim_utils.CuboidCfg(
@@ -85,7 +85,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
 
     # Pusher
     pusher_length = 0.1
-    pusher_default_pos = 1.3
+    pusher_default_pos = 1.4
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.CuboidCfg(
@@ -140,7 +140,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 5
+    num_observations = 8
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -193,9 +193,9 @@ class SlidingLongEnv(DirectRLEnv):
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         
         # Goal randomisation range
-        self.goal_location_min = -0.5
-        self.goal_location_max = 0.5
-        self.discrete_goals = torch.tensor([0.25, 0.75], device=self.device)
+        self.goal_location_min = 0.25
+        self.goal_location_max = 0.75
+        self.discrete_goals = torch.tensor([0.25], device=self.device)
         self.discrete_goal = True
         
         # Normalisaion range: goal
@@ -324,7 +324,8 @@ class SlidingLongEnv(DirectRLEnv):
         dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
         restitutions = curr_materials.squeeze().reshape((-1,3))[:,2].to(self.scene.env_origins.device)
 
-        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
         
         observations = {"policy": obs}
 
@@ -506,6 +507,7 @@ class SlidingLongEnv(DirectRLEnv):
             cuboidpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
         )
         cuboidpuck2_default_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[env_ids, 7:])
+        # cuboidpuck2_default_state[:, 7] = -2.5
         self.cuboidpuck2_state[env_ids] = cuboidpuck2_default_state.clone()
         self.cuboidpuck2.write_root_state_to_sim(cuboidpuck2_default_state, env_ids)
 
@@ -566,6 +568,6 @@ def compute_rewards(
     rew_pushervel = rew_scale_pushervel * normalized_pushervel
     rew_pushervel0 = 0.05 * modified_tensor
 
-    total_reward = rew_goal + rew_termination + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
 
     return total_reward
