@@ -34,10 +34,15 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
+import os
+from datetime import datetime
+import numpy as np
+import h5py
 
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import parse_env_cfg
 
+# from skrl.resources.preprocessors.torch import RunningStandardScaler 
 
 def main():
     """Random actions agent with Isaac Lab environment."""
@@ -48,32 +53,44 @@ def main():
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 
-    memory = RandomMemory(memory_size=300, num_envs=env.num_envs, device=env.device)
+    log_root_path = os.path.join("logs", "exp_data", "predefined_slide")
+    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_dir = os.path.join(log_root_path, log_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    max_episode_length = env.unwrapped.max_episode_length
+    memory = RandomMemory(memory_size=(max_episode_length-1)*env.num_envs, num_envs=env.num_envs, device=env.device)
 
     observation_shape = env.observation_space.shape  # This should be (num_envs, 8)
     action_shape = env.action_space.shape  # This should be (num_envs, 1)
-    print(vars(env))
-    print(observation_shape)
+    # print(vars(env))
+    # print(observation_shape)
 
     memory.create_tensor(name="states", size=observation_shape[1], dtype=torch.float32)
     memory.create_tensor(name="actions", size=action_shape[1], dtype=torch.float32)
     memory.create_tensor(name="rewards", size=env.num_envs, dtype=torch.float32)
     memory.create_tensor(name="terminated", size=env.num_envs, dtype=torch.bool)
+    memory.create_tensor(name="truncated", size=env.num_envs, dtype=torch.bool)
     memory.create_tensor(name="log_prob", size=env.num_envs, dtype=torch.float32)
     memory.create_tensor(name="values", size=env.num_envs, dtype=torch.float32)
     memory.create_tensor(name="returns", size=env.num_envs, dtype=torch.float32)
     memory.create_tensor(name="advantages", size=env.num_envs, dtype=torch.float32)
 
-    print(memory)
-    print("Memory size check")
-    print(memory.get_tensor_by_name("states").shape)
-    print(memory.get_tensor_by_name("actions").shape)
-    print(memory.get_tensor_by_name("rewards").shape)
-    print(memory.get_tensor_by_name("terminated").shape)
-    print(memory.get_tensor_by_name("log_prob").shape)
-    print(memory.get_tensor_by_name("values").shape)
-    print(memory.get_tensor_by_name("returns").shape)
-    print(memory.get_tensor_by_name("advantages").shape)
+    # print(memory)
+    # print("Memory size check")
+    # print(memory.get_tensor_by_name("states").shape)
+    # print(memory.get_tensor_by_name("actions").shape)
+    # print(memory.get_tensor_by_name("rewards").shape)
+    # print(memory.get_tensor_by_name("terminated").shape)
+    # print(memory.get_tensor_by_name("log_prob").shape)
+    # print(memory.get_tensor_by_name("values").shape)
+    # print(memory.get_tensor_by_name("returns").shape)
+    # print(memory.get_tensor_by_name("advantages").shape)
+
+    # running_standard_scaler = RunningStandardScaler(size=2)
+    # data = torch.rand(3, 2)  # tensor of shape (N, 2)
+    # running_standard_scaler(data)
 
     # print info (this is vectorized environment)
     print(f"[INFO]: Gym observation space: {env.observation_space}")
@@ -84,29 +101,30 @@ def main():
     print("State should look like thissssssssss")
     print(states.shape)
     # simulate environment
-    while simulation_app.is_running():
+    count = 0
+    max_count = (max_episode_length-1)*env.num_envs
+    while simulation_app.is_running() and count<max_count:
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
-            pusher_velocity = -0.0
+            pusher_velocity = -2.5
             # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
-            print("Action shape")
-            print(actions.shape)
+
             # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             # apply actions
             next_states_dict, rewards, terminated, truncated, infos = env.step(actions)
 
             next_states = next_states_dict['policy'].clone()
 
-            print("State shape")
-            print(states.shape)
-            print(actions.shape)
-            print(rewards.shape)
-            print(next_states.shape)
-            print(terminated.shape)
-            print(truncated.shape)
+            # print("State shape")
+            # print(states.shape)
+            # print(actions.shape)
+            # print(rewards.shape)
+            # print(next_states.shape)
+            # print(terminated.shape)
+            # print(truncated.shape)
             # memory.add_samples(terminated=terminated)
 
             memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
@@ -115,10 +133,22 @@ def main():
 
             # print("Memory")
             # tensors_names = ["states", "actions", "log_prob", "values", "returns", "advantages"]
-            # tensors_names = ["states", "actions"]
+            tensors_names = ["states", "actions"]
             # print(memory.sample_all(tensors_names))
-            if truncated[0]==True:
-                print(memory.get_tensor_by_name("states"))
+            # if truncated[0]==True:
+            #     print(memory.get_tensor_by_name("states"))
+
+            print("Memory size")
+            # print(memory.sample_all(tensors_names))
+            print(memory.get_tensor_by_name("states").shape)
+            print(count)
+            count+=1
+    
+    log_h5_path = os.path.join(log_dir, 'test.hdf5')
+    with h5py.File(log_h5_path, 'w') as f: 
+        dset = f.create_dataset("states", data = memory.get_tensor_by_name("states").cpu().numpy())
+        dset = f.create_dataset("truncated", data = memory.get_tensor_by_name("truncated").cpu().numpy())
+
 
     # close the simulator
     env.close()

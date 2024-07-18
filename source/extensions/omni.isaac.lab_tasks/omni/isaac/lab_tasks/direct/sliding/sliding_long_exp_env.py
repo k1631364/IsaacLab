@@ -39,14 +39,14 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.05),
+          "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
           "num_buckets": 250,
       },
   )
 
 @configclass
-class SlidingLongEnvCfg(DirectRLEnvCfg):
+class SlidingLongExpEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -69,7 +69,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.1
-    puck_default_pos = 1.3
+    puck_default_pos = 1.7
     cuboidpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpuck2",
         spawn=sim_utils.CuboidCfg(
@@ -85,7 +85,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
 
     # Pusher
     pusher_length = 0.1
-    pusher_default_pos = 1.4
+    pusher_default_pos = 1.8
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.CuboidCfg(
@@ -140,7 +140,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 5
+    num_observations = 8
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -156,10 +156,10 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
     rew_scale_pushervel = -0.1
 
 
-class SlidingLongEnv(DirectRLEnv):
-    cfg: SlidingLongEnvCfg
+class SlidingLongExpEnv(DirectRLEnv):
+    cfg: SlidingLongExpEnvCfg
 
-    def __init__(self, cfg: SlidingLongEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: SlidingLongExpEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
 
@@ -195,7 +195,7 @@ class SlidingLongEnv(DirectRLEnv):
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.discrete_goals = torch.tensor([0.75], device=self.device)
+        self.discrete_goals = torch.tensor([0.25], device=self.device)
         self.discrete_goal = True
         
         # Normalisaion range: goal
@@ -269,6 +269,11 @@ class SlidingLongEnv(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
+
+        mask = self.episode_length_buf > 0
+        mask = mask.unsqueeze(1)  # Shape becomes [32, 1]
+        self.actions[mask] = 0.0
+
         # print(self.actions.shape)
         # pass
 
@@ -324,8 +329,8 @@ class SlidingLongEnv(DirectRLEnv):
         dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
         restitutions = curr_materials.squeeze().reshape((-1,3))[:,2].to(self.scene.env_origins.device)
 
-        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
         
         observations = {"policy": obs}
 
@@ -462,8 +467,12 @@ class SlidingLongEnv(DirectRLEnv):
         true_tensor = torch.ones(self.scene.num_envs, dtype=torch.bool)
 
         episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
+        # print("Timeout")
+        # print(time_out)
+        # print(self.episode_length_buf)
+        # print(self.max_episode_length)
 
-        return out_of_bounds, time_out, self.goal_bounds, episode_failed
+        return false_tensor, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")
