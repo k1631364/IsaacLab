@@ -34,6 +34,8 @@ from tqdm import tqdm
 import torch.optim as optim
 import torch.nn as nn
 
+import pickle
+
 import model.VAE as vaemodel
 
 # from skrl.resources.preprocessors.torch import RunningStandardScaler
@@ -73,6 +75,11 @@ def main():
     log_fig_dir = os.path.join("logs", "exp_data", "exploration_ssl")
     if not os.path.exists(log_fig_dir):
         os.makedirs(log_fig_dir)
+
+    # Model path (to save)
+    log_model_dir = os.path.join("logs", "exp_model", "exploration_ssl")
+    if not os.path.exists(log_model_dir):
+        os.makedirs(log_model_dir)
 
     # Read data
     hf = h5py.File(log_h5_path, 'r')
@@ -230,8 +237,31 @@ def main():
         wandb.log({"KL": avg_KL_loss})
         wandb.log({"reconstruction": avg_rec_loss})
 
+    # Save the learnt model to the file
+    model_path = log_model_dir + "/VAE_best.pth"
+    torch.save(model.to(torch_device).state_dict(), model_path)
+
+    model_params_dict = {
+        "input_dim": input_dim, 
+        "latent_dim": latent_dim, 
+        "char_dim": char_dim, 
+        "output_dim": output_dim, 
+        "dropout": dropout, 
+        "KLbeta": KLbeta, 
+        "rec_weight": rec_weight, 
+        "learning_rate": learning_rate, 
+        "model_path": model_path, 
+        "max_count": max_count 
+    }
+    model_params_path = log_model_dir + "model_params_dict.pkl"
+    with open(model_params_path, "wb") as fp: 
+        pickle.dump(model_params_dict, fp)
 
     # Eval
+
+    # Load the learnt model
+    model.load_state_dict(torch.load(model_path, map_location=torch.device(torch_device)))
+
     model.eval()
     total_loss = 0.0
     KL_loss = 0.0

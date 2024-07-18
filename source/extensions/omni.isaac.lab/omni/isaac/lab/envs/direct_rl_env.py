@@ -342,6 +342,11 @@ class DirectRLEnv(gym.Env):
 
         self.extras["log"] = {"success_rate": success_rate}
 
+        self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf}
+
+        # print("Episode curr step")
+        # print(self.episode_length_buf)
+
         # return observations, rewards, resets and extras
         return self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, self.extras
 

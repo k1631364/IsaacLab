@@ -182,3 +182,5 @@ class DirectRLEnvCfg(ManagerBasedEnvCfg):
     """Settings for adding noise to the observation buffer.
        Please refer to the :class:`omni.isaac.lab.utils.noise.NoiseModel` class for more details.
     """
+
+    max_count: int = None

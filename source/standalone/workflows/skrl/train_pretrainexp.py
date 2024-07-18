@@ -50,7 +50,7 @@ import gymnasium as gym
 import os
 from datetime import datetime
 
-from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG,PPO_RNN
+from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG,PPO_RNN, PPO_RNN_EXP
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -60,7 +60,9 @@ from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
-from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
+# from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
+from omni.isaac.lab_tasks.utils.wrappers.skrl_twophase import SkrlSequentialLogTrainer_TwoPhase, SkrlVecEnvWrapper, process_skrl_cfg
+
 
 # Test comment (Working)
 def main():
@@ -74,6 +76,10 @@ def main():
         args_cli.task, use_gpu=not args_cli.cpu, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
     )
     experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_cfg_entry_point")
+
+    # print("Env configgggggg")
+    # print(env_cfg)
+    # env_cfg["max_count"] = 47
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
@@ -165,7 +171,7 @@ def main():
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
-    agent = PPO_RNN(
+    agent = PPO_RNN_EXP(
         models=models,
         memory=memory,
         cfg=agent_cfg,
@@ -177,7 +183,7 @@ def main():
     # configure and instantiate a custom RL trainer for logging episode events
     # https://skrl.readthedocs.io/en/latest/api/trainers.html
     trainer_cfg = experiment_cfg["trainer"]
-    trainer = SkrlSequentialLogTrainer(cfg=trainer_cfg, env=env, agents=agent)
+    trainer = SkrlSequentialLogTrainer_TwoPhase(cfg=trainer_cfg, env=env, agents=agent)
 
     print("Before expeirmnet start!!!!!!!!!!!!!!!!!!!!!!!")
 
