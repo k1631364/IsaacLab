@@ -69,7 +69,9 @@ def main():
     log_dir = os.path.join(log_root_path, log_dir)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-17_12-56-47/test.hdf5"
+    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-17_12-56-47/test.hdf5"
+    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-19_17-52-50/test.hdf5"
+    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
 
     # Fig file path (to save)
     log_fig_dir = os.path.join("logs", "exp_data", "exploration_ssl")
@@ -85,10 +87,25 @@ def main():
     hf = h5py.File(log_h5_path, 'r')
     states = hf['states'][:]    # shape: (max_count*num_epoch, num_envs, obs_dim)
     truncated = hf['truncated'][:]
+    exp_traj = hf['exp_traj'][:]
+    num_itr = hf['num_itr'][()]
+
+    print(exp_traj.shape[0])
+    print(num_itr)
+
+    # # Get the maximum step index
+    # max_step = len(trajectory) - 1
+
+    # # Use np.clip to ensure steps are within valid range
+    # clipped_steps = np.clip(current_steps, 0, max_step)
+
+    # # Get actions using the clipped steps
+    # actions = trajectory[clipped_steps]
 
     env_id = 27
     env_num = states.shape[1]
-    max_count = int(states.shape[0]/env_num)
+    # max_count = int(states.shape[0]/env_num)
+    max_count = int(states.shape[0]/num_itr)
     traj_id = 27
 
     # # Plot original data (before reshape)
@@ -241,6 +258,7 @@ def main():
     model_path = log_model_dir + "/VAE_best.pth"
     torch.save(model.to(torch_device).state_dict(), model_path)
 
+
     model_params_dict = {
         "input_dim": input_dim, 
         "latent_dim": latent_dim, 
@@ -251,7 +269,8 @@ def main():
         "rec_weight": rec_weight, 
         "learning_rate": learning_rate, 
         "model_path": model_path, 
-        "max_count": max_count 
+        "max_count": max_count, 
+        "exp_traj": exp_traj
     }
     model_params_path = log_model_dir + "model_params_dict.pkl"
     with open(model_params_path, "wb") as fp: 

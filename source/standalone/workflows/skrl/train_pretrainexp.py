@@ -50,7 +50,7 @@ import gymnasium as gym
 import os
 from datetime import datetime
 
-from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG,PPO_RNN, PPO_RNN_EXP
+from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG,PPO_RNN
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -171,7 +171,7 @@ def main():
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
-    agent = PPO_RNN_EXP(
+    agent = PPO_RNN(
         models=models,
         memory=memory,
         cfg=agent_cfg,

@@ -302,6 +302,10 @@ class DirectRLEnv(gym.Env):
         if len(reset_env_ids) > 0:
             self._reset_idx(reset_env_ids)
 
+        # reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+        # if len(reset_env_ids) > 0 or len(check_exp_end_id) > 0:
+        #     self._reset_idx2(reset_env_ids, check_exp_end_id)
+
         # post-step: step interval event
         if self.cfg.events:
             if "interval" in self.event_manager.available_modes:
@@ -342,7 +346,8 @@ class DirectRLEnv(gym.Env):
 
         self.extras["log"] = {"success_rate": success_rate}
 
-        self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf}
+        self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf, 
+                                    "exp_traj": self.obs_buf['exp_traj']}
 
         # print("Episode curr step")
         # print(self.episode_length_buf)
@@ -525,6 +530,25 @@ class DirectRLEnv(gym.Env):
             self._observation_noise_model.reset(env_ids)
         # reset the episode length buffer
         self.episode_length_buf[env_ids] = 0
+
+    def _reset_idx2(self, env_ids: Sequence[int]):
+        """Reset environments based on specified indices.
+
+        Args:
+            env_ids: List of environment ids which must be reset
+        """
+        self.scene.reset(env_ids)
+        # apply events such as randomizations for environments that need a reset
+        # if self.cfg.events:
+        #     if "reset" in self.event_manager.available_modes:
+        #         self.event_manager.apply(env_ids=env_ids, mode="reset")
+        # if self.cfg.action_noise_model:
+        #     self._action_noise_model.reset(env_ids)
+        # if self.cfg.observation_noise_model:
+        #     self._observation_noise_model.reset(env_ids)
+        # reset the episode length buffer
+        # self.episode_length_buf[env_ids] = 0
+
 
     # this can be done through configs as well
     def _setup_scene(self):

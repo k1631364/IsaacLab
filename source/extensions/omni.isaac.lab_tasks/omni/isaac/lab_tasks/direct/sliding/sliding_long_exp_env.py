@@ -270,11 +270,12 @@ class SlidingLongExpEnv(DirectRLEnv):
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
 
-        mask = self.episode_length_buf > 0
-        mask = mask.unsqueeze(1)  # Shape becomes [32, 1]
-        self.actions[mask] = 0.0
+        # mask = self.episode_length_buf > 0
+        # mask = mask.unsqueeze(1)  # Shape becomes [32, 1]
+        # self.actions[mask] = 0.0
 
-        # print(self.actions.shape)
+        # print("Episode lengthhhhhhh")
+        # print(self.episode_length_buf.shape)
         # pass
 
     def _apply_action(self) -> None:

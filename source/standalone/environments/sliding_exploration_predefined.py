@@ -58,9 +58,11 @@ def main():
     log_dir = os.path.join(log_root_path, log_dir)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+
+    num_itr = 50
     
     max_episode_length = env.unwrapped.max_episode_length
-    memory = RandomMemory(memory_size=(max_episode_length-1)*env.num_envs, num_envs=env.num_envs, device=env.device)
+    memory = RandomMemory(memory_size=(max_episode_length-1)*num_itr, num_envs=env.num_envs, device=env.device)
 
     observation_shape = env.observation_space.shape  # This should be (num_envs, 8)
     action_shape = env.action_space.shape  # This should be (num_envs, 1)
@@ -102,7 +104,8 @@ def main():
     print(states.shape)
     # simulate environment
     count = 0
-    max_count = (max_episode_length-1)*env.num_envs
+    max_count = (max_episode_length-1)*num_itr
+    exp_traj = []
     while simulation_app.is_running() and count<max_count:
         # run everything in inference mode
         with torch.inference_mode():
@@ -111,6 +114,16 @@ def main():
             # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
+
+            if infos == {}:
+                print("Noneeeee")
+            else:
+                mask = infos["two_phase"]["episode_length_buf"] > 0
+                mask = mask.unsqueeze(1)  # Shape becomes [32, 1]
+                actions[mask] = 0.0
+
+            if count<(max_episode_length-1):
+                exp_traj.append(actions[0,0].item())
 
             # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             # apply actions
@@ -134,21 +147,27 @@ def main():
             # print("Memory")
             # tensors_names = ["states", "actions", "log_prob", "values", "returns", "advantages"]
             tensors_names = ["states", "actions"]
-            # print(memory.sample_all(tensors_names))
+            print(memory.sample_all(tensors_names))
             # if truncated[0]==True:
             #     print(memory.get_tensor_by_name("states"))
 
             print("Memory size")
             # print(memory.sample_all(tensors_names))
-            print(memory.get_tensor_by_name("states").shape)
+            # print(memory.get_tensor_by_name("states").shape)
             print(count)
             count+=1
     
+    print("Exp traj shapeee")
+    print(np.array(exp_traj).shape)
     log_h5_path = os.path.join(log_dir, 'test.hdf5')
     with h5py.File(log_h5_path, 'w') as f: 
         dset = f.create_dataset("states", data = memory.get_tensor_by_name("states").cpu().numpy())
         dset = f.create_dataset("truncated", data = memory.get_tensor_by_name("truncated").cpu().numpy())
+        dset = f.create_dataset("exp_traj", data = np.array(exp_traj))
+        dset = f.create_dataset("num_itr", data = num_itr)
 
+    print("Log path")
+    print(log_h5_path)
 
     # close the simulator
     env.close()

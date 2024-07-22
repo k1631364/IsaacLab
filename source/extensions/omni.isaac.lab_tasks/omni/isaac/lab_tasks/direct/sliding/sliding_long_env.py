@@ -140,7 +140,7 @@ class SlidingLongEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 5
+    num_observations = 21
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -212,7 +212,7 @@ class SlidingLongEnv(DirectRLEnv):
         self.success_rates = []
 
         # Past state tracking
-        self.past_timestep = 1
+        self.past_timestep = 5
         self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
@@ -293,26 +293,42 @@ class SlidingLongEnv(DirectRLEnv):
         curr_cuboidpusher2_state[:, 0:3] = (
             curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
         )
-        self.past_pusher_pos = torch.cat((self.past_pusher_pos,  curr_cuboidpusher2_state[:, 0].reshape((-1,1))), dim=1)
-        past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
-        normalized_past_pusher_pos_obs = (past_pusher_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # self.past_pusher_pos = torch.cat((self.past_pusher_pos,  curr_cuboidpusher2_state[:, 0].reshape((-1,1))), dim=1)
+        # past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
+        # normalized_past_pusher_pos_obs = (past_pusher_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
         
-        self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
-        past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
-        normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        normalized_curr_pusher_pos = (curr_cuboidpusher2_state[:, 0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        self.past_pusher_pos = torch.cat((self.past_pusher_pos, normalized_curr_pusher_pos.reshape((-1,1))), dim=1)
+        normalized_past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
+
+        # self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
+        # past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
+        # normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+
+        normalized_curr_pusher_vel = (curr_cuboidpusher2_state[:, 7] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        self.past_pusher_vel = torch.cat((self.past_pusher_vel, normalized_curr_pusher_vel.reshape((-1,1))), dim=1)
+        normalized_past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
         
         # Puck state
         curr_cuboidpuck2_state = self.cuboidpuck2_state.clone()
         curr_cuboidpuck2_state[:, 0:3] = (
             curr_cuboidpuck2_state[:, 0:3] - self.scene.env_origins
         )
-        self.past_puck_pos = torch.cat((self.past_puck_pos,  curr_cuboidpuck2_state[:, 0].reshape((-1,1))), dim=1)
-        past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
-        normalized_past_puck_pos_obs = (past_puck_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # self.past_puck_pos = torch.cat((self.past_puck_pos,  curr_cuboidpuck2_state[:, 0].reshape((-1,1))), dim=1)
+        # past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
+        # normalized_past_puck_pos_obs = (past_puck_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+
+        normalized_curr_puck_pos = (curr_cuboidpuck2_state[:, 0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        self.past_puck_pos = torch.cat((self.past_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
+        normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
         
-        self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cuboidpuck2_state[:, 7].reshape((-1,1))), dim=1)
-        past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
-        normalized_past_puck_vel_obs = (past_puck_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        # self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cuboidpuck2_state[:, 7].reshape((-1,1))), dim=1)
+        # past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
+        # normalized_past_puck_vel_obs = (past_puck_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        
+        normalized_curr_puck_vel = (curr_cuboidpuck2_state[:, 7] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        self.past_puck_vel = torch.cat((self.past_puck_vel, normalized_curr_puck_vel.reshape((-1,1))), dim=1)
+        normalized_past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
         
         # Goal
         goal_tensor = self.goal_locations[:,0].clone()

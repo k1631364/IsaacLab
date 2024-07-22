@@ -31,6 +31,7 @@ import torch
 import tqdm
 import pickle
 import torch.optim as optim
+import time
 
 from skrl.agents.torch import Agent
 from skrl.envs.wrappers.torch import Wrapper, wrap_env
@@ -173,7 +174,7 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
             self.agents.init(trainer_cfg=self.cfg)
 
         # Use gpu if available. Otherwise, use cpu. 
-        torch_device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+        self.torch_device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
         model_params_path = "/workspace/isaaclab/logs/exp_model/exploration_sslmodel_params_dict.pkl"
         with open(model_params_path, "rb") as fp: 
@@ -189,18 +190,25 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
         learning_rate = model_params_dict["learning_rate"]
         model_path = model_params_dict["model_path"]
         self.max_count = model_params_dict["max_count"]
+        self.exp_traj_action = model_params_dict["exp_traj"]        
 
         print("Env infoooooo")
         print(env.exp_max_count)
-        if env.exp_max_count != self.max_count:
+        if env.exp_max_count != self.max_count or self.exp_traj_action.shape[0] != self.max_count:
             print("MAX COUNT FOR EXPLORATION NOT MATCHING")
+            time.sleep(300)
         # print(if env.exp_episode_length_buf!=self.max_count: )
 
-        # Create VAE model
-        model = vaemodel.VAE(x_dim=input_dim, z_dim=latent_dim, char_dim=char_dim, y_dim=output_dim, dropout=dropout, beta=KLbeta, alpha=rec_weight).to(torch_device)
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        self.exp_traj_action = self.exp_traj_action.reshape((self.max_count,-1))
+        self.exp_traj_action = torch.from_numpy(self.exp_traj_action).to(torch.float32).to(self.torch_device)
 
-        model.load_state_dict(torch.load(model_path, map_location=torch.device(torch_device)))
+        self.z_embeddings = torch.zeros((self.env.num_envs, latent_dim)).to(self.torch_device)
+
+        # Create VAE model
+        self.model = vaemodel.VAE(x_dim=input_dim, z_dim=latent_dim, char_dim=char_dim, y_dim=output_dim, dropout=dropout, beta=KLbeta, alpha=rec_weight).to(self.torch_device)
+        optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+
+        self.model.load_state_dict(torch.load(model_path, map_location=torch.device(self.torch_device)))
 
     def train(self):
         """Train the agents sequentially.
@@ -226,31 +234,57 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
             # pre-interaction
             self.agents.pre_interaction(timestep=timestep, timesteps=self.timesteps)
             # compute actions
-            # print("Episode buffffffff")
-            # print(infos)
+            curr_step = None
             if infos == {}:
-                print("Noneeeee")
+                curr_step = torch.zeros(self.env.num_envs, dtype=torch.int).to(self.torch_device)
             else:
-                print(infos["two_phase"])
-                time_out = infos["two_phase"]["episode_length_buf"] >= self.max_count - 1
-                print(time_out)
-            # if "two_phase" in infos:
-            #     print(infos["two_phase"])
+                curr_step = infos["two_phase"]["episode_length_buf"]
+                exp_traj = infos["two_phase"]["exp_traj"]
+                # print("Exp traj")
+                # print(curr_step)
+                # print(exp_traj)
+                # print(exp_traj.shape)
+                check_exp_end_id = curr_step==self.max_count-1
+                exp_traj_batch = exp_traj[check_exp_end_id]
+                check_episode_end_id = curr_step==0
+                self.z_embeddings[check_episode_end_id] = 0
+                # print("Exp end")
+                # print(check_exp_end_id)
+                # print(check_episode_end_id)
+                if exp_traj_batch.shape[0] != 0: 
+                    x_char = torch.zeros(exp_traj_batch.shape[0])
+                    lower_bound, z, y, y_char = self.model(exp_traj_batch, x_char, exp_traj_batch, self.torch_device)
+                    # print(z.shape)
+                    self.z_embeddings[check_exp_end_id, :] = z
+                    
+                temp_states = states.clone()
+                temp_states[:, -self.z_embeddings.shape[1]:] = self.z_embeddings
+                states = temp_states
+
+            mask = curr_step<self.max_count
+            final_actions = torch.zeros(self.env.num_envs, self.env.action_space.shape[0], dtype=torch.float32).to(self.torch_device)
+
             with torch.no_grad():
                 # print(states.shape)  # torch.Size([# of env, obs dim])
                 # print(timestep)   # 0
                 # print(self.timesteps)   # 1600
                 actions = self.agents.act(states, timestep=timestep, timesteps=self.timesteps)[0]
-                # print("Actionssss")
-                # print(actions.shape)
+                # actions = self.agents.act(states, timestep=timestep, timesteps=self.timesteps)[0]
+            # print(curr_step[mask])
+            # masked_curr_step = curr_step[mask]
+            final_actions[mask] = self.exp_traj_action[curr_step[mask]]
+            final_actions[~mask] = actions[~mask]
+            # print("Final actionnnn")
+            # print(final_actions)
             # step the environments
-            next_states, rewards, terminated, truncated, infos = self.env.step(actions)
+            # next_states, rewards, terminated, truncated, infos = self.env.step(actions)
+            next_states, rewards, terminated, truncated, infos = self.env.step(final_actions)
             # note: here we do not call render scene since it is done in the env.step() method
             # record the environments' transitions
             with torch.no_grad():
                 self.agents.record_transition(
                     states=states,
-                    actions=actions,
+                    actions=final_actions,
                     rewards=rewards,
                     next_states=next_states,
                     terminated=terminated,

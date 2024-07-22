@@ -95,6 +95,9 @@ RUN echo "export ISAACLAB_PATH=${ISAACLAB_PATH}" >> ${HOME}/.bashrc && \
 ARG WANDB_API_KEY
 ENV WANDB_API_KEY=${WANDB_API_KEY}
 
+RUN ${ISAACSIM_ROOT_PATH}/python.sh -m pip install seaborn
+RUN ${ISAACSIM_ROOT_PATH}/python.sh -m pip install -U scikit-learn
+
 
 # make working directory as the Isaac Lab directory
 # this is the default directory when the container is run
