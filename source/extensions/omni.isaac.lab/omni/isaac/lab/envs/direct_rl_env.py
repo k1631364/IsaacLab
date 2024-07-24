@@ -346,8 +346,11 @@ class DirectRLEnv(gym.Env):
 
         self.extras["log"] = {"success_rate": success_rate}
 
-        self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf, 
-                                    "exp_traj": self.obs_buf['exp_traj']}
+        if "exp_traj" in self.obs_buf: 
+            self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf, 
+                                         "exp_traj": self.obs_buf['exp_traj']}
+        else:
+            self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf}
 
         # print("Episode curr step")
         # print(self.episode_length_buf)

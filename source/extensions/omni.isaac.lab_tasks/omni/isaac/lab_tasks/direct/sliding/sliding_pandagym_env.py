@@ -39,14 +39,14 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.3),
+          "dynamic_friction_range": (0.05, 0.05),
           "restitution_range": (1.0, 1.0),
           "num_buckets": 250,
       },
   )
 
 @configclass
-class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
+class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -69,7 +69,7 @@ class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.1
-    puck_default_pos = 1.7
+    puck_default_pos = 1.3
     cuboidpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpuck2",
         spawn=sim_utils.CuboidCfg(
@@ -85,7 +85,7 @@ class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
 
     # Pusher
     pusher_length = 0.1
-    pusher_default_pos = 1.8
+    pusher_default_pos = 1.4
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.CuboidCfg(
@@ -108,7 +108,7 @@ class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
         prim_path="/Visual/Goal1",
         markers={
             "cube": sim_utils.CuboidCfg(
-                size=(goal_length, 1.0, 0.01),
+                size=(puck_length, 0.2, 0.1),
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
             ),
         },
@@ -137,14 +137,10 @@ class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
 
     decimation = 5
-    episode_length_s = 4.0
-
-    exp_max_count = 47
-    z_dim = 5
-
+    episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 1 # action dim
-    num_observations = 13 + z_dim
+    num_observations = 5
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -160,19 +156,12 @@ class SlidingTwoPhaseEnvCfg(DirectRLEnvCfg):
     rew_scale_pushervel = -0.1
 
 
-class SlidingTwoPhaseEnv(DirectRLEnv):
-    cfg: SlidingTwoPhaseEnvCfg
+class SlidingPandaGymEnv(DirectRLEnv):
+    cfg: SlidingPandaGymEnvCfg
 
-    def __init__(self, cfg: SlidingTwoPhaseEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: SlidingPandaGymEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
-
-        self.exp_max_count = self.cfg.exp_max_count
-        self.z_dim = self.cfg.z_dim 
-
-        self.task_phase = None
-        
-        # self.reset_env_ids2_bool = None
 
         self.action_scale = self.cfg.action_scale
 
@@ -223,17 +212,11 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         self.success_rates = []
 
         # Past state tracking
-        self.past_timestep = 3
+        self.past_timestep = 1
         self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
-
-        # Exp traj tracking
-        self.exp_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.exp_max_count), device=self.scene.env_origins.device)
-        self.exp_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.exp_max_count), device=self.scene.env_origins.device)
-        self.exp_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.exp_max_count), device=self.scene.env_origins.device)
-        self.exp_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.exp_max_count), device=self.scene.env_origins.device)
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -289,8 +272,6 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         # print(self.actions.shape)
         # pass
 
-        # self.episode_length_buf >= self.max_episode_length
-
     def _apply_action(self) -> None:
         # print("Env apply action called!!!!")
         new_linvel = torch.zeros((self.scene.num_envs, 3))
@@ -302,11 +283,10 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         new_angvel = torch.zeros((self.scene.num_envs, 3))
         new_angvel = new_angvel.to(self.scene.env_origins.device)
         self.cuboidpusher2.set_velocities(new_linvel, new_angvel)
-
         # pass
 
     def _get_observations(self) -> dict:
-        # print("Env get observations called!!!!")  
+        # print("Env get observations called!!!!")
         
         # Pusher state
         curr_cuboidpusher2_state = self.cuboidpusher2_state.clone()
@@ -341,9 +321,6 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         normalized_curr_puck_pos = (curr_cuboidpuck2_state[:, 0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
         self.past_puck_pos = torch.cat((self.past_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
         normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
-
-        self.exp_puck_pos = torch.cat((self.exp_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
-        self.exp_puck_pos = self.exp_puck_pos[:, -self.exp_max_count:]
         
         # self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cuboidpuck2_state[:, 7].reshape((-1,1))), dim=1)
         # past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
@@ -352,7 +329,7 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         normalized_curr_puck_vel = (curr_cuboidpuck2_state[:, 7] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
         self.past_puck_vel = torch.cat((self.past_puck_vel, normalized_curr_puck_vel.reshape((-1,1))), dim=1)
         normalized_past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
-
+        
         # Goal
         goal_tensor = self.goal_locations[:,0].clone()
         normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
@@ -366,18 +343,7 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
 
-        # print("Exp traj")
-        # print(self.exp_puck_pos.shape)
-        # print(self.episode_length_buf)
-
-        tmp_z_zeros = torch.zeros((self.scene.num_envs, self.z_dim)).to(self.device)
-        obs = torch.cat((obs, tmp_z_zeros), dim=1)
-
-        # print("Obsssss")
-        # print(obs.shape)
-        
-        observations = {"policy": obs, 
-                        "exp_traj": self.exp_puck_pos}
+        observations = {"policy": obs}
 
         return observations
 
@@ -421,7 +387,6 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
             self.episode_failed,
             self.goal_bounds, 
         )
-        # total_reward[~self.task_phase] = 0.0
         return total_reward
         # pass
 
@@ -465,6 +430,11 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         goal_bounds_max_puck_posx = curr_cuboidpuck2_state[:,0] < self.maxgoal_locations    # becomes false if overshoot
         goal_bounds_min_puck_posx = curr_cuboidpuck2_state[:,0] > self.mingoal_locations    # becomes true once in goal region
 
+        print("Cubu posssssss")
+        print(curr_cuboidpuck2_state[:,[0, 1]].shape)
+
+        print(goalloca)
+
         curr_out_of_bounds_goal_puck_posx_count = goal_bounds_max_puck_posx & goal_bounds_min_puck_posx 
         self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
 
@@ -489,138 +459,33 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         # print("goal_bounds")    
         # print(self.goal_bounds)   
         # print("out_of_bounds_min_puck_velx")  
-        # print(out_of_bounds_min_puck_velx)         
+        # print(out_of_bounds_min_puck_velx)        
+        
+        # if out_of_bounds_max_pusher_posx[0]:
+        #     print("out_of_bounds_max_pusher_posx") 
+        # if out_of_bounds_min_pusher_posx[0]: 
+        #     print("out_of_bounds_min_pusher_posx") 
+        # if out_of_bounds_max_puck_posx[0]: 
+        #     print("out_of_bounds_max_puck_posx") 
+        # if out_of_bounds_min_puck_posx[0]: 
+        #     print("out_of_bounds_min_puck_posx") 
+        # if overshoot_max_puck_posx[0]: 
+        #     print("overshoot_max_puck_posx")  
+        # if self.goal_bounds[0]: 
+        #     print("goal_bounds")    
+        # if out_of_bounds_min_puck_velx[0]: 
+        #     print("out_of_bounds_min_puck_velx")   
+
+        # if time_out[0]: 
+        #     print("time_out")  
 
         false_tensor = torch.zeros(self.scene.num_envs, dtype=torch.bool)
         true_tensor = torch.ones(self.scene.num_envs, dtype=torch.bool)
 
         episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
 
-        task_phase = self.episode_length_buf > self.exp_max_count
-        out_of_bounds = out_of_bounds & task_phase
-
-        episode_failed = episode_failed & task_phase
-
-        self.task_phase = task_phase
-
-        # print(task_phase)
-
-        # if task_phase[0]: 
-        #     print(self.episode_length_buf)
-        #     print(self.out_of_bounds_min_puck_velx_count)
-        #     if out_of_bounds_max_pusher_posx[0]:
-        #         print("out_of_bounds_max_pusher_posx") 
-        #     if out_of_bounds_min_pusher_posx[0]: 
-        #         print("out_of_bounds_min_pusher_posx") 
-        #     if out_of_bounds_max_puck_posx[0]: 
-        #         print("out_of_bounds_max_puck_posx") 
-        #     if out_of_bounds_min_puck_posx[0]: 
-        #         print("out_of_bounds_min_puck_posx") 
-        #     if overshoot_max_puck_posx[0]: 
-        #         print("overshoot_max_puck_posx")  
-        #     if self.goal_bounds[0]: 
-        #         print("goal_bounds")    
-        #     if out_of_bounds_min_puck_velx[0]: 
-        #         print("out_of_bounds_min_puck_velx")   
-
-        #     if time_out[0]: 
-        #         print("time_out") 
-
-        # # Exp phase end
-        check_exp_end_id = self.episode_length_buf==self.exp_max_count
-
-        # # check_exp_end_id = self.episode_length_buf==10
-        
-        # # check_exp_end_id = self.episode_length_buf>-100
-
-        # print("Check exp end id")
-        # print(check_exp_end_id)
-        # print(self.episode_length_buf)
-        # self.reset_env_ids2_bool = check_exp_end_id
-        reset_env_ids2 = check_exp_end_id
-        reset_env_ids2 = reset_env_ids2.nonzero(as_tuple=False).squeeze(-1)
-        if len(reset_env_ids2) > 0:
-            self._reset_idx2(reset_env_ids2)
-
-        # return out_of_bounds, time_out, self.goal_bounds, episode_failed, None
-        # return false_tensor, false_tensor, self.goal_bounds, episode_failed
         return out_of_bounds, time_out, self.goal_bounds, episode_failed
 
-    def _reset_idx2(self, env_ids: Sequence[int] | None):
-        # print("Env reset idx called!!!!")
-
-        if env_ids is None:
-            env_ids = self.cuboidpuck2._ALL_INDICES
-        super()._reset_idx2(env_ids)
-
-        # Reset goal
-        # curr_success_rate = self.extras.get('log')
-        # if curr_success_rate is not None: 
-        #     # print(curr_success_rate["success_rate"])
-        #     if curr_success_rate["success_rate"] > self.success_threshold: 
-        #         # self.rew_scale_goal += 5
-        #         self.success_threshold += 0.1
-        #         self.goal_length -= 0.1 
-
-        # Reset exp trajetory
-        # self.exp_puck_pos[env_ids] = 0.0
-
-        if self.discrete_goal:
-            random_indices = torch.randint(len(self.discrete_goals), size=(len(env_ids),), device=self.device)
-            goal_noise = self.discrete_goals[random_indices]
-        else:
-            goal_noise = sample_uniform(self.goal_location_max, self.goal_location_min, (len(env_ids)), device=self.device)
-        goal_pos_offset = self.goal_locations.clone()
-        goal_pos_offset[env_ids, 0] = goal_noise
-
-        self.goal_locations = goal_pos_offset.clone()
-        self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
-        self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        goal_pos_offset = goal_pos_offset.to(self.scene.env_origins.device)
-
-        goal_pos = self.scene.env_origins + goal_pos_offset
-        goal_pos = goal_pos.to(self.scene.env_origins.device)
-        goal_rot = torch.zeros((self.scene.env_origins.shape[0], 4))
-        goal_rot = goal_rot.to(self.scene.env_origins.device)
-        self.markergoal1.visualize(goal_pos, goal_rot) 
-
-        # Reset puck
-        cuboidpuck2_default_state = self.cuboidpuck2.data.default_root_state.clone()[env_ids]
-        pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
-        cuboidpuck2_default_state[:, 0:3] = (
-            cuboidpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
-        )
-        cuboidpuck2_default_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[env_ids, 7:])
-        # cuboidpuck2_default_state[:, 7] = -2.5
-        self.cuboidpuck2_state[env_ids] = cuboidpuck2_default_state.clone()
-        self.cuboidpuck2.write_root_state_to_sim(cuboidpuck2_default_state, env_ids)
-
-        # Reset pusher
-        cuboidpusher2_default_state = self.cuboidpusher2.data.default_root_state.clone()[env_ids]
-        pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
-        cuboidpusher2_default_state[:, 0:3] = (
-            cuboidpusher2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
-        )
-        cuboidpusher2_default_state[:, 7:] = torch.zeros_like(self.cuboidpusher2.data.default_root_state[env_ids, 7:])
-        self.cuboidpusher2_state[env_ids] = cuboidpusher2_default_state.clone()
-        self.cuboidpusher2.write_root_state_to_sim(cuboidpusher2_default_state, env_ids)
-
-        # reset table
-        cuboidtable2_default_state = self.cuboidtable2.data.default_root_state.clone()[env_ids]
-        pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
-        cuboidtable2_default_state[:, 0:3] = (
-            cuboidtable2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
-        )
-        cuboidtable2_default_state[:, 7:] = torch.zeros_like(self.cuboidtable2.data.default_root_state[env_ids, 7:])
-        self.cuboidtable2_state[env_ids] = cuboidtable2_default_state.clone()
-        self.cuboidtable2.write_root_state_to_sim(cuboidtable2_default_state, env_ids) 
-
-        # Reset episode count
-        # self.episode_length_buf[env_ids] = 0
-
-        pass
-
-    
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")
 
@@ -636,9 +501,6 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         #         # self.rew_scale_goal += 5
         #         self.success_threshold += 0.1
         #         self.goal_length -= 0.1 
-
-        # Reset exp trajetory
-        self.exp_puck_pos[env_ids] = 0.0
 
         if self.discrete_goal:
             random_indices = torch.randint(len(self.discrete_goals), size=(len(env_ids),), device=self.device)

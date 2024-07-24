@@ -31,7 +31,10 @@ import torch
 import tqdm
 import pickle
 import torch.optim as optim
+import os
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 
 from skrl.agents.torch import Agent
 from skrl.envs.wrappers.torch import Wrapper, wrap_env
@@ -248,6 +251,7 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
                 exp_traj_batch = exp_traj[check_exp_end_id]
                 check_episode_end_id = curr_step==0
                 self.z_embeddings[check_episode_end_id] = 0
+                    
                 # print("Exp end")
                 # print(check_exp_end_id)
                 # print(check_episode_end_id)
@@ -256,6 +260,22 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
                     lower_bound, z, y, y_char = self.model(exp_traj_batch, x_char, exp_traj_batch, self.torch_device)
                     # print(z.shape)
                     self.z_embeddings[check_exp_end_id, :] = z
+
+                    # Fig file path (to save)
+                    log_fig_eval_dir = os.path.join("logs", "exp_data", "exploration_rl")
+                    if not os.path.exists(log_fig_eval_dir):
+                        os.makedirs(log_fig_eval_dir)
+                    
+                    # xpoints = np.arange(0, exp_traj_batch.shape[1])
+                    # ypoints = exp_traj_batch[0,:].cpu().detach().numpy()
+                    # plt.plot(xpoints, ypoints, label="dynamic friction: ")
+
+                    # plt.legend()
+                    # plt.xlabel("Time (step)")
+                    # plt.ylabel("Puck pos x (m)")
+
+                    # log_fig_path = os.path.join(log_fig_eval_dir, 'test3.png')
+                    # plt.savefig(log_fig_path)
                     
                 temp_states = states.clone()
                 temp_states[:, -self.z_embeddings.shape[1]:] = self.z_embeddings
@@ -274,12 +294,19 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
             # masked_curr_step = curr_step[mask]
             final_actions[mask] = self.exp_traj_action[curr_step[mask]]
             final_actions[~mask] = actions[~mask]
+            # print("Maskkkkkkk")
+            # print(mask)
             # print("Final actionnnn")
             # print(final_actions)
             # step the environments
             # next_states, rewards, terminated, truncated, infos = self.env.step(actions)
             next_states, rewards, terminated, truncated, infos = self.env.step(final_actions)
             # note: here we do not call render scene since it is done in the env.step() method
+            infos["phase"] = {"mask": mask}
+
+            # print("Infosssssss")
+            # print(infos["phase"]["mask"])
+
             # record the environments' transitions
             with torch.no_grad():
                 self.agents.record_transition(
@@ -340,11 +367,70 @@ class SkrlSequentialLogTrainer_TwoPhase(Trainer):
         # evaluation loop
         for timestep in tqdm.tqdm(range(self.initial_timestep, self.timesteps), disable=self.disable_progressbar):
             # compute actions
+            curr_step = None
+            if infos == {}:
+                curr_step = torch.zeros(self.env.num_envs, dtype=torch.int).to(self.torch_device)
+            else:
+                curr_step = infos["two_phase"]["episode_length_buf"]
+                exp_traj = infos["two_phase"]["exp_traj"]
+                # print("Exp traj")
+                # print(curr_step)
+                # print(exp_traj)
+                # print(exp_traj.shape)
+                check_exp_end_id = curr_step==self.max_count-1
+                exp_traj_batch = exp_traj[check_exp_end_id]
+                check_episode_end_id = curr_step==0
+                self.z_embeddings[check_episode_end_id] = 0
+                    
+                # print("Exp end")
+                # print(check_exp_end_id)
+                # print(check_episode_end_id)
+                if exp_traj_batch.shape[0] != 0: 
+                    x_char = torch.zeros(exp_traj_batch.shape[0])
+                    lower_bound, z, y, y_char = self.model(exp_traj_batch, x_char, exp_traj_batch, self.torch_device)
+                    # print(z.shape)
+                    self.z_embeddings[check_exp_end_id, :] = z
+
+                    # Fig file path (to save)
+                    log_fig_eval_dir = os.path.join("logs", "exp_data", "exploration_rl")
+                    if not os.path.exists(log_fig_eval_dir):
+                        os.makedirs(log_fig_eval_dir)
+                    
+                    # xpoints = np.arange(0, exp_traj_batch.shape[1])
+                    # ypoints = exp_traj_batch[0,:].cpu().detach().numpy()
+                    # plt.plot(xpoints, ypoints, label="dynamic friction: ")
+
+                    # plt.legend()
+                    # plt.xlabel("Time (step)")
+                    # plt.ylabel("Puck pos x (m)")
+
+                    # log_fig_path = os.path.join(log_fig_eval_dir, 'test3.png')
+                    # plt.savefig(log_fig_path)
+                    
+                temp_states = states.clone()
+                temp_states[:, -self.z_embeddings.shape[1]:] = self.z_embeddings
+                states = temp_states
+
+            mask = curr_step<self.max_count
+            final_actions = torch.zeros(self.env.num_envs, self.env.action_space.shape[0], dtype=torch.float32).to(self.torch_device)
+
             with torch.no_grad():
                 actions = torch.vstack([
                     agent.act(states[scope[0] : scope[1]], timestep=timestep, timesteps=self.timesteps)[0]
                     for agent, scope in zip(self.agents, self.agents_scope)
                 ])
+
+            final_actions[mask] = self.exp_traj_action[curr_step[mask]]
+            final_actions[~mask] = actions[~mask]
+            # print("Maskkkkkkk")
+            # print(mask)
+            # print("Final actionnnn")
+            # print(final_actions)
+            # step the environments
+            # next_states, rewards, terminated, truncated, infos = self.env.step(actions)
+            next_states, rewards, terminated, truncated, infos = self.env.step(final_actions)
+            # note: here we do not call render scene since it is done in the env.step() method
+            infos["phase"] = {"mask": mask}
 
             # step the environments
             next_states, rewards, terminated, truncated, infos = self.env.step(actions)
