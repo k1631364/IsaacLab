@@ -39,6 +39,9 @@ def randomize_rigid_body_material(
     restitution_range: tuple[float, float],
     num_buckets: int,
     asset_cfg: SceneEntityCfg,
+    com_range_x: tuple[float, float] = None,
+    com_range_y: tuple[float, float] = None,
+    com_range_z: tuple[float, float] = None,
 ):
     """Randomize the physics materials on all geometries of the asset.
 
@@ -78,6 +81,10 @@ def randomize_rigid_body_material(
 
     # retrieve material buffer
     materials = asset.root_physx_view.get_material_properties()
+    coms = asset.root_physx_view.get_coms()
+    # print("Materialsssss")
+    # print(materials)
+    # print(coms)
 
     # sample material properties from the given ranges
     material_samples = torch.zeros(materials[env_ids].shape)
@@ -85,15 +92,48 @@ def randomize_rigid_body_material(
     material_samples[..., 1].uniform_(*dynamic_friction_range)
     material_samples[..., 2].uniform_(*restitution_range)
 
+    if com_range_x!=None:
+        com_samples = torch.zeros(coms[env_ids].shape)
+        com_samples[..., 0].uniform_(*com_range_x)
+        com_samples[..., 1].uniform_(*com_range_y)
+        com_samples[..., 2].uniform_(*com_range_z)
+
     # create uniform range tensor for bucketing
     lo = torch.tensor([static_friction_range[0], dynamic_friction_range[0], restitution_range[0]], device="cpu")
     hi = torch.tensor([static_friction_range[1], dynamic_friction_range[1], restitution_range[1]], device="cpu")
 
+    if com_range_x!=None: 
+        lo_com = torch.tensor([com_range_x[0], com_range_y[0], com_range_z[0]], device="cpu")
+        hi_com = torch.tensor([com_range_x[1], com_range_y[1], com_range_z[1]], device="cpu")
+    
     # to avoid 64k material limit in physx, we bucket materials by binning randomized material properties
     # into buckets based on the number of buckets specified
     for d in range(3):
         buckets = torch.tensor([(hi[d] - lo[d]) * i / num_buckets + lo[d] for i in range(num_buckets)], device="cpu")
         material_samples[..., d] = buckets[torch.searchsorted(buckets, material_samples[..., d].contiguous()) - 1]
+
+        # if d==1: 
+        #     print("Buckets")
+        #     print(material_samples.shape)
+
+    if com_range_x!=None:
+        for d in range(3):
+            buckets_com = torch.tensor([(hi_com[d] - lo_com[d]) * i / num_buckets + lo_com[d] for i in range(num_buckets)], device="cpu")
+            com_samples[..., d] = buckets_com[torch.searchsorted(buckets_com, com_samples[..., d].contiguous()) - 1]
+
+            # if d==0: 
+            #     print("Buckets coms")
+            #     print(com_samples)
+
+        # buckets_com = torch.tensor([(hi_com[0] - lo_com[0]) * i / num_buckets + lo_com[0] for i in range(num_buckets)], device="cpu")
+        # print("Buckets com")
+        # print(buckets_com.shape)
+        # com_samples[..., 0] = buckets_com[torch.searchsorted(buckets_com, com_samples[..., 0].contiguous()) - 1]
+        # com_samples[..., 0] = buckets_com[torch.searchsorted(buckets_com, com_samples[..., 0].contiguous()) - 1]
+        com_samples[..., 6] = 1.0
+
+        # print("Com samplessss")
+        # print(com_samples)
 
     # update material buffer with new samples
     if isinstance(asset, Articulation) and asset_cfg.body_ids != slice(None):
@@ -117,10 +157,13 @@ def randomize_rigid_body_material(
             materials[env_ids, start_idx:end_idx] = material_samples[:, start_idx:end_idx]
     else:
         materials[env_ids] = material_samples
+        if com_range_x!=None:
+            coms[env_ids] = com_samples
 
     # apply to simulation
     asset.root_physx_view.set_material_properties(materials, env_ids)
-
+    if com_range_x!=None:
+        asset.root_physx_view.set_coms(coms, env_ids)
 
 def add_body_mass(
     env: ManagerBasedEnv,

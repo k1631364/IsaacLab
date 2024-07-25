@@ -619,7 +619,6 @@ class SlidingTwoPhaseEnv(DirectRLEnv):
         # self.episode_length_buf[env_ids] = 0
 
         pass
-
     
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")

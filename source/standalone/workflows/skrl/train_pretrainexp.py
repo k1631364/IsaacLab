@@ -172,7 +172,7 @@ def main():
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
-    agent = PPO_RNN_EXP(
+    agent = PPO_RNN(
         models=models,
         memory=memory,
         cfg=agent_cfg,

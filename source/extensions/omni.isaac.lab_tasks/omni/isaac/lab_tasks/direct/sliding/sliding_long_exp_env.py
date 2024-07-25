@@ -41,9 +41,13 @@ class EventCfg:
           "static_friction_range": (0.05, 0.05),
           "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
+          "com_range_x": (-0.025, 0.025), 
+          "com_range_y": (-0.05, 0.05),
+          "com_range_z": (0.0, 0.0),
           "num_buckets": 250,
       },
   )
+#    [0.1, 0.2, 0.1],
 
 @configclass
 class SlidingLongExpEnvCfg(DirectRLEnvCfg):

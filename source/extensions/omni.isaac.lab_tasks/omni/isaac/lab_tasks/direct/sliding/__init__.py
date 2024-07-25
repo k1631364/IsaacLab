@@ -67,7 +67,8 @@ gym.register(
         "env_cfg_entry_point": SlidingTwoPhaseEnvCfg,
         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
         "rsl_rl_cfg_entry_point": agents.rsl_rl_ppo_cfg.CartpolePPORunnerCfg,
-        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_twophase_cfg.yaml",
+        # "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_twophase_cfg.yaml",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_cfg.yaml",
         "sb3_cfg_entry_point": f"{agents.__name__}:sb3_ppo_cfg.yaml",
     },
 )

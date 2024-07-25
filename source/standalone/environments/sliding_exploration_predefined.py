@@ -147,14 +147,14 @@ def main():
             # print("Memory")
             # tensors_names = ["states", "actions", "log_prob", "values", "returns", "advantages"]
             tensors_names = ["states", "actions"]
-            print(memory.sample_all(tensors_names))
+            # print(memory.sample_all(tensors_names))
             # if truncated[0]==True:
             #     print(memory.get_tensor_by_name("states"))
 
-            print("Memory size")
+            # print("Memory size")
             # print(memory.sample_all(tensors_names))
             # print(memory.get_tensor_by_name("states").shape)
-            print(count)
+            # print(count)
             count+=1
     
     print("Exp traj shapeee")
