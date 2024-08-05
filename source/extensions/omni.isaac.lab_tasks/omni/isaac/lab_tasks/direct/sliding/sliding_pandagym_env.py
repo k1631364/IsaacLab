@@ -72,7 +72,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.05
-    puck_default_pos = 1.3
+    puck_default_pos = 1.2
     cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cylinderpuck2",
         spawn=sim_utils.CylinderCfg(
@@ -84,7 +84,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
             activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(puck_default_pos, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(puck_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
     # # Pusher
@@ -105,7 +105,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
 
     # Pusher
     pusher_length = 0.03
-    pusher_default_pos = 1.4
+    pusher_default_pos = 1.3
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.SphereCfg(
@@ -116,7 +116,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
             activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
     # Goal
@@ -216,10 +216,10 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.goal_threshold = 0.2
         
         # Goal randomisation range
-        self.goal_location_min = 0.25
-        self.goal_location_max = 0.75
+        self.goal_location_min = 0.5
+        self.goal_location_max = 0.9
         self.discrete_goals = torch.tensor([0.75], device=self.device)
-        self.discrete_goal = True
+        self.discrete_goal = False
         
         # Normalisaion range: goal
         self.goal_location_normmax = 2.0
@@ -408,7 +408,6 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(com_z)
         # torch.Size([32, 1, 3])
 
-
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
@@ -511,8 +510,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
             if curr_success_rate["success_rate"] > self.success_threshold: 
-                # self.goal_threshold -= 0.03
-                # print(self.goal_threshold)
+                self.goal_threshold -= 0.01
+                print(self.goal_threshold)
                 # self.rew_scale_goal += 5
                 # self.success_threshold += 0.1
                 # self.goal_length -= 0.1 
