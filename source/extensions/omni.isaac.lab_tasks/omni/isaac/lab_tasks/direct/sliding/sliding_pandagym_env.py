@@ -41,8 +41,8 @@ class EventCfg:
           "static_friction_range": (0.05, 0.05),
           "dynamic_friction_range": (0.05, 0.05),
           "restitution_range": (1.0, 1.0),
-          "com_range_x": (-0.02, 0.02), 
-          "com_range_y": (-0.02, 0.02),
+          "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
+          "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
           "com_range_z": (0.0, 0.0),
           "num_buckets": 250,
       },
@@ -210,16 +210,16 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
 
         self.goal_length = self.cfg.goal_length
-        self.success_threshold = 0.8
+        self.success_threshold = 0.9
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        self.goal_threshold = 0.2
+        self.goal_threshold = 0.1
         
         # Goal randomisation range
         self.goal_location_min = 0.5
         self.goal_location_max = 0.9
         self.discrete_goals = torch.tensor([0.75], device=self.device)
-        self.discrete_goal = False
+        self.discrete_goal = True
         
         # Normalisaion range: goal
         self.goal_location_normmax = 2.0
@@ -509,13 +509,13 @@ class SlidingPandaGymEnv(DirectRLEnv):
         curr_success_rate = self.extras.get('log')
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold: 
+            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.05: 
                 self.goal_threshold -= 0.01
                 print(self.goal_threshold)
                 # self.rew_scale_goal += 5
                 # self.success_threshold += 0.1
                 # self.goal_length -= 0.1 
-                pass
+        #         pass
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
