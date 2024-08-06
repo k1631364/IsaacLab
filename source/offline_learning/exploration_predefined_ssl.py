@@ -71,7 +71,10 @@ def main():
         os.makedirs(log_dir)
     # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-17_12-56-47/test.hdf5"
     # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-19_17-52-50/test.hdf5"
-    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
+    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
+    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-08-06_10-19-43/test.hdf5"
+
+    # logs/exp_data/predefined_slide/2024-08-06_09-53-14/test.hdf5
 
     # Fig file path (to save)
     log_fig_dir = os.path.join("logs", "exp_data", "exploration_ssl")
@@ -185,7 +188,7 @@ def main():
 
     # Data info
     input_dim = max_count
-    latent_dim = 5	# latent space dimension
+    latent_dim = 2	# latent space dimension
     output_dim = input_dim
     char_dim = 1 # # of explicit characteristics
 
@@ -333,7 +336,10 @@ def main():
         latent_z_df['dynamic friction'] = pd.DataFrame(label_np)
         print(latent_z_df)
 
-        n_c = 3
+        if latent_dim <=2: 
+            n_c = 2
+        else: 
+            n_c = 3
         pca = PCA(n_components = n_c)
         data = latent_z_df.loc[:,range(latent_dim)]
         df_pca = pd.DataFrame(pca.fit_transform(data)) 
@@ -342,11 +348,15 @@ def main():
 
         # contribution rate
         pca_cont = pca.explained_variance_ratio_
-        eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1', 'PC2'])
-        eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1], pca_cont[2])
+        if n_c==2: 
+            eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1'])
+            eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1])
+        else: 
+            eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1', 'PC2'])
+            eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1], pca_cont[2])
 
-        for pc_x in range(2):
-            for pc_y in range(2):
+        for pc_x in range(n_c):
+            for pc_y in range(n_c):
                 if pc_x < pc_y:
                     #print(pc_x)
                     #print(pc_y)

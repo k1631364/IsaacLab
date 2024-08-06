@@ -88,6 +88,15 @@ class RigidObject(AssetBase):
             Use this view with caution. It requires handling of tensors in a specific way.
         """
         return self._root_physx_view
+    
+    @property
+    def sim_physx_view(self) -> physx.SimulationView:
+        """Rigid body view for the asset (PhysX).
+
+        Note:
+            Use this view with caution. It requires handling of tensors in a specific way.
+        """
+        return self._physics_sim_view
 
     @property
     def body_physx_view(self) -> physx.RigidBodyView:

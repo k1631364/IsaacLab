@@ -68,7 +68,8 @@ def main():
     # Dataset
 
     # Read data
-    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
+    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
+    log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-08-06_10-19-43/test.hdf5"
 
     hf = h5py.File(log_h5_path, 'r')
     states = hf['states'][:]    # shape: (max_count*num_epoch, num_envs, obs_dim)
@@ -104,6 +105,13 @@ def main():
     # Use gpu if available. Otherwise, use cpu. 
     torch_device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
+    # Embedding look up table path (to save)
+    log_model_dir = os.path.join("logs", "exp_lookuptable", "predefined")
+    if not os.path.exists(log_model_dir):
+        os.makedirs(log_model_dir)
+
+
+    # model_params_path = "/workspace/isaaclab/logs/exp_model/exploration_sslmodel_params_dict.pkl"
     model_params_path = "/workspace/isaaclab/logs/exp_model/exploration_sslmodel_params_dict.pkl"
     with open(model_params_path, "rb") as fp: 
         model_params_dict = pickle.load(fp)
@@ -182,7 +190,14 @@ def main():
         latent_z_df['dynamic friction'] = pd.DataFrame(label_np)
         print(latent_z_df)
 
-        n_c = 3
+        embedding_lookuptable_path = log_model_dir + "/dynamicfriction_z2.pkl"
+        with open(embedding_lookuptable_path, "wb") as fp: 
+            pickle.dump(latent_z_df, fp)
+
+        if latent_dim <=2: 
+            n_c = 2
+        else: 
+            n_c = 3
         pca = PCA(n_components = n_c)
         data = latent_z_df.loc[:,range(latent_dim)]
         df_pca = pd.DataFrame(pca.fit_transform(data)) 
@@ -191,8 +206,12 @@ def main():
 
         # contribution rate
         pca_cont = pca.explained_variance_ratio_
-        eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1', 'PC2'])
-        eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1], pca_cont[2])
+        if n_c==2: 
+            eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1'])
+            eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1])
+        else: 
+            eval_latent_pca_table = wandb.Table(columns=['Variable', 'PC0', 'PC1', 'PC2'])
+            eval_latent_pca_table.add_data('PCA latent space (eval data)', pca_cont[0], pca_cont[1], pca_cont[2])
 
         for pc_x in range(2):
             for pc_y in range(2):

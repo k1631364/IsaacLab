@@ -112,7 +112,7 @@ def main():
         with torch.inference_mode():
             # sample actions from -1 to 1
             # pusher_velocity = -2.5 #(Working initially)
-            pusher_velocity = -0.0
+            pusher_velocity = -3.0
             # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
@@ -123,12 +123,14 @@ def main():
                 mask = infos["two_phase"]["episode_length_buf"] > 0
                 mask = mask.unsqueeze(1)  # Shape becomes [32, 1]
                 actions[mask] = 0.0
+                # print(infos["two_phase"]["episode_length_buf"] )
 
             if count<(max_episode_length-1):
                 exp_traj.append(actions[0,0].item())
 
-            # zeros_tensor = torch.zeros(actions.shape[0], 1, device=env.unwrapped.device)
-            # actions = torch.cat((actions, zeros_tensor), dim=1)
+            # 2d action space (pad with zeros)
+            zeros_tensor = torch.zeros(actions.shape[0], 1, device=env.unwrapped.device)
+            actions = torch.cat((actions, zeros_tensor), dim=1)
 
             # print("Action space")
             # print(actions)
