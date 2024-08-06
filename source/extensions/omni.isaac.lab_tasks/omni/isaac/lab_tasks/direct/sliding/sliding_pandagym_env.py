@@ -39,7 +39,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.05),
+          "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
           "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
           "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
@@ -128,7 +128,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
         prim_path="/Visual/Goal1",
         markers={
             "cylinder": sim_utils.CylinderCfg(
-                radius = puck_length, 
+                radius = puck_length+0.05, 
                 height = 0.05, 
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
             ),
@@ -161,7 +161,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 5
+    num_observations = 6
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -292,6 +292,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
+        # print("Actionssss")
+        # print(actions)
         # print(self.actions.shape)
         # pass
 
@@ -304,6 +306,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(self.actions.shape)
         xvel = self.actions[:,[0,1]]
         # xvel = -0.0
+        print("X vellllll")
+        print(xvel)
         new_linvel[:,[0,1]] = new_linvel[:,[0,1]]+xvel
         new_angvel = torch.zeros((self.scene.num_envs, 3))
         new_angvel = new_angvel.to(self.scene.env_origins.device)
@@ -409,7 +413,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # torch.Size([32, 1, 3])
 
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
 
         observations = {"policy": obs}
@@ -509,13 +514,13 @@ class SlidingPandaGymEnv(DirectRLEnv):
         curr_success_rate = self.extras.get('log')
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.05: 
+            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.0499: 
                 self.goal_threshold -= 0.01
                 print(self.goal_threshold)
                 # self.rew_scale_goal += 5
                 # self.success_threshold += 0.1
                 # self.goal_length -= 0.1 
-        #         pass
+                pass
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
@@ -575,8 +580,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
 
         episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
 
-        return out_of_bounds, time_out, self.goal_bounds, episode_failed
-        # return false_tensor, time_out, self.goal_bounds, episode_failed
+        # return out_of_bounds, time_out, self.goal_bounds, episode_failed
+        return false_tensor, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")

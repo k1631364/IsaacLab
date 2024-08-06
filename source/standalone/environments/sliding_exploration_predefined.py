@@ -35,6 +35,7 @@ simulation_app = app_launcher.app
 import gymnasium as gym
 import torch
 import os
+import time
 from datetime import datetime
 import numpy as np
 import h5py
@@ -110,7 +111,8 @@ def main():
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
-            pusher_velocity = -2.5
+            # pusher_velocity = -2.5 #(Working initially)
+            pusher_velocity = -0.0
             # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
@@ -124,6 +126,13 @@ def main():
 
             if count<(max_episode_length-1):
                 exp_traj.append(actions[0,0].item())
+
+            # zeros_tensor = torch.zeros(actions.shape[0], 1, device=env.unwrapped.device)
+            # actions = torch.cat((actions, zeros_tensor), dim=1)
+
+            # print("Action space")
+            # print(actions)
+            # time.sleep(500)
 
             # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             # apply actions
