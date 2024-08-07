@@ -116,7 +116,7 @@ def main():
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
     # wrap around environment for skrl
     env = SkrlVecEnvWrapper(env)  # same as: `wrap_env(env, wrapper="isaac-orbit")`
-
+    
     # set seed for the experiment (override from command line)
     set_seed(args_cli_seed if args_cli_seed is not None else experiment_cfg["seed"])
 
