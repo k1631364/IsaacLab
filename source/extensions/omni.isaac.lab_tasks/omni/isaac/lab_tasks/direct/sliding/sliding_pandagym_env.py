@@ -30,6 +30,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 
 import numpy as np
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+from decimal import Decimal
 
 @configclass
 class EventCfg:
@@ -128,7 +129,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
         prim_path="/Visual/Goal1",
         markers={
             "cylinder": sim_utils.CylinderCfg(
-                radius = puck_length+0.05, 
+                radius = 0.05, 
                 height = 0.05, 
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
             ),
@@ -161,7 +162,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 5
+    num_observations = 9
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -213,7 +214,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.success_threshold = 0.9
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        self.goal_threshold = 0.1
+        self.goal_threshold = Decimal(0.2)
         
         # Goal randomisation range
         self.goal_location_min = 0.5
@@ -234,12 +235,29 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # Success rate tracking
         self.success_rates = []
 
+        state_pos_2d = [0,1]
+        state_pos_1d = [0]
+        self.state_pos_idx = state_pos_2d
+
+        state_vel_2d = [7,8]
+        state_vel_1d = [7]
+        self.state_vel_idx = state_vel_2d
+
         # Past state tracking
         self.past_timestep = 1
-        self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
-        self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
-        self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
-        self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        initial_pos_tensor = torch.zeros(self.past_timestep, self.num_envs, len(self.state_pos_idx), device=self.scene.env_origins.device)
+        initial_vel_tensor = torch.zeros(self.past_timestep, self.num_envs, len(self.state_vel_idx), device=self.scene.env_origins.device)
+        # self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_pusher_pos = [initial_pos_tensor]
+        # self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_puck_pos = [initial_pos_tensor]
+        # self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_pusher_vel = [initial_vel_tensor]
+        # self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
+        self.past_puck_vel = [initial_vel_tensor]
+
+        self.curriculum_count = 0
+        
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -350,17 +368,28 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
         # normalized_past_pusher_pos_obs = (past_pusher_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
         
-        normalized_curr_pusher_pos = (curr_cuboidpusher2_state[:, 0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        self.past_pusher_pos = torch.cat((self.past_pusher_pos, normalized_curr_pusher_pos.reshape((-1,1))), dim=1)
-        normalized_past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
+        normalized_curr_pusher_pos = (curr_cuboidpusher2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # self.past_pusher_pos = torch.cat((self.past_pusher_pos, normalized_curr_pusher_pos.reshape((-1, 1))), dim=1)
+        self.past_pusher_pos.append(normalized_curr_pusher_pos.unsqueeze(0))
+        # past_pusher_pos_tensor = torch.stack(self.past_pusher_pos)
+        past_pusher_pos_tensor = torch.cat(self.past_pusher_pos, dim=0)
+        # print("Pusher possssss")
+        # print(normalized_curr_pusher_pos.unsqueeze(0).shape)
+        # print(past_pusher_pos_tensor.shape)
+        normalized_past_pusher_pos_obs  = past_pusher_pos_tensor[-self.past_timestep:, :, :]
+        # normalized_past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
+        # print(normalized_past_pusher_pos_obs.shape)
 
         # self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
         # past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
         # normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
 
-        normalized_curr_pusher_vel = (curr_cuboidpusher2_state[:, 7] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        self.past_pusher_vel = torch.cat((self.past_pusher_vel, normalized_curr_pusher_vel.reshape((-1,1))), dim=1)
-        normalized_past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
+        normalized_curr_pusher_vel = (curr_cuboidpusher2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        # self.past_pusher_vel = torch.cat((self.past_pusher_vel, normalized_curr_pusher_vel.reshape((-1,1))), dim=1)
+        self.past_pusher_vel.append(normalized_curr_pusher_vel.unsqueeze(0))
+        past_pusher_vel_tensor = torch.cat(self.past_pusher_vel, dim=0)
+        # normalized_past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
+        normalized_past_pusher_vel_obs  = past_pusher_vel_tensor[-self.past_timestep:, :, :]
         
         # Puck state
         curr_cylinderpuck2_state = self.cylinderpuck2_state.clone()
@@ -371,17 +400,26 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
         # normalized_past_puck_pos_obs = (past_puck_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
 
-        normalized_curr_puck_pos = (curr_cylinderpuck2_state[:, 0] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        self.past_puck_pos = torch.cat((self.past_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
-        normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
+        normalized_curr_puck_pos = (curr_cylinderpuck2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
+        # self.past_puck_pos = torch.cat((self.past_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
+        self.past_puck_pos.append(normalized_curr_puck_pos.unsqueeze(0))
+        past_puck_pos_tensor = torch.cat(self.past_puck_pos, dim=0)
+        # normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
+        normalized_past_puck_pos_obs  = past_puck_pos_tensor[-self.past_timestep:, :, :]
         
         # self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cylinderpuck2_state[:, 7].reshape((-1,1))), dim=1)
         # past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
         # normalized_past_puck_vel_obs = (past_puck_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
         
-        normalized_curr_puck_vel = (curr_cylinderpuck2_state[:, 7] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        self.past_puck_vel = torch.cat((self.past_puck_vel, normalized_curr_puck_vel.reshape((-1,1))), dim=1)
-        normalized_past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
+        normalized_curr_puck_vel = (curr_cylinderpuck2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
+        # self.past_puck_vel = torch.cat((self.past_puck_vel, normalized_curr_puck_vel.reshape((-1,1))), dim=1)
+        self.past_puck_vel.append(normalized_curr_puck_vel.unsqueeze(0))
+        self.past_puck_vel = self.past_puck_vel[-self.past_timestep:]
+        # print("Past puck vel array")
+        # print(len(self.past_puck_vel))
+        past_puck_vel_tensor = torch.cat(self.past_puck_vel, dim=0)
+        # normalized_past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
+        normalized_past_puck_vel_obs  = past_puck_vel_tensor
         
         # Goal
         goal_tensor = self.goal_locations[:,0].clone()
@@ -409,9 +447,10 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # torch.Size([32, 1, 3])
 
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1)), dim=1)
 
         observations = {"policy": obs}
 
@@ -510,13 +549,16 @@ class SlidingPandaGymEnv(DirectRLEnv):
         curr_success_rate = self.extras.get('log')
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.0499: 
-                self.goal_threshold -= 0.01
+            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.0499 and self.curriculum_count>self.max_episode_length: 
+                self.goal_threshold -= Decimal(0.05)
                 print(self.goal_threshold)
                 # self.rew_scale_goal += 5
                 # self.success_threshold += 0.1
                 # self.goal_length -= 0.1 
+                self.curriculum_count = 0
                 pass
+            else:
+                self.curriculum_count+=1
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
