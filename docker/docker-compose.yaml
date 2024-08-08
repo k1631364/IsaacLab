@@ -59,12 +59,24 @@ x-default-isaac-lab-environment: &default-isaac-lab-environment
   - ISAACSIM_PATH=${DOCKER_ISAACLAB_PATH}/_isaac_sim
   - OMNI_KIT_ALLOW_ROOT=1
 
+# x-default-isaac-lab-deploy: &default-isaac-lab-deploy
+#   resources:
+#     reservations:
+#       devices:
+#         - driver: nvidia
+#           count: all
+#           capabilities: [ gpu ]
+
+
 x-default-isaac-lab-deploy: &default-isaac-lab-deploy
   resources:
+    limits:
+      cpus: "48"              # number of cores
+      memory: 64g           # limit container usage
     reservations:
       devices:
         - driver: nvidia
-          count: all
+          device_ids: ["1"]  # specify the GPU ID here if necessary
           capabilities: [ gpu ]
 
 services:
