@@ -27,9 +27,13 @@ from omni.isaac.lab.sensors import ContactSensor, ContactSensorCfg, RayCaster, R
 from omni.isaac.lab.managers import EventTermCfg as EventTerm
 import omni.isaac.lab.envs.mdp as mdp
 from omni.isaac.lab.managers import SceneEntityCfg
+from omni.isaac.lab.utils.noise import GaussianNoiseCfg, NoiseModelWithAdditiveBiasCfg
 
 import numpy as np
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+import pickle
+from sklearn.neighbors import NearestNeighbors
+
 
 @configclass
 class EventCfg:
@@ -39,10 +43,10 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.1, 0.1),
+          "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
-          "com_range_x": (0.00, 0.00), # (-0.02, 0.02),
-          "com_range_y": (0.00, 0.00), # (-0.02, 0.02),
+          "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
+          "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
           "com_range_z": (0.0, 0.0),
           "num_buckets": 250,
       },
@@ -54,6 +58,17 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
     events: EventCfg = EventCfg()
+
+    # at every time-step add gaussian noise + bias. The bias is a gaussian sampled at reset
+    action_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(
+        noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.05, operation="add"),
+        bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.015, operation="abs"),
+    )
+    # at every time-step add gaussian noise + bias. The bias is a gaussian sampled at reset
+    observation_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(
+        noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.002, operation="add"),
+        bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.0001, operation="abs"),
+    )
     
     # Table
     table_length = 4.0
@@ -161,7 +176,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 9
+    num_observations = 11
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -256,6 +271,27 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.past_puck_vel = [initial_vel_tensor]
 
         self.curriculum_count = 0
+
+        # Embeddings
+        embedding_lookuptable_path = "/workspace/isaaclab/logs/exp_lookuptable/predefined/dynamicfriction_z2.pkl"
+        with open(embedding_lookuptable_path, "rb") as fp: 
+            self.embedding_lookuptable = pickle.load(fp)
+
+        # min_values_all = self.embedding_lookuptable.min()
+        # max_values_all = self.embedding_lookuptable.max()
+
+        # self.min_values = min_values_all[[0, 1]].values
+        # self.max_values = max_values_all[[0, 1]].values
+
+        self.min_value_global = self.embedding_lookuptable[[0, 1]].min().min()
+        self.max_value_global = self.embedding_lookuptable[[0, 1]].max().max()
+
+        # print("Min max valuessss")
+        # print(self.min_value_global)
+        # print(self.max_value_global)
+
+        # print(self.embedding_lookuptable.shape) 
+
         
 
     def _setup_scene(self):
@@ -448,12 +484,36 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(com_z)
         # torch.Size([32, 1, 3])
 
+        # Embeddings
+        # print("Dynamic Frictionsssss: should be (32,1)")
+        dynamic_frictions_np = dynamic_frictions.cpu().detach().numpy().reshape(self.num_envs, -1)
+        # print(dynamic_frictions_np.shape)
+        # print(self.embedding_lookuptable[['dynamic friction']].shape)
+
+        neigh_dynamicfric = NearestNeighbors(n_neighbors=1)
+        neigh_dynamicfric.fit(self.embedding_lookuptable[['dynamic friction']].to_numpy())
+
+        dynamicfric_match_indices = neigh_dynamicfric.kneighbors(dynamic_frictions_np, return_distance=False)
+        # print("Look up table")
+        # print(self.embedding_lookuptable)
+        dynamicfric_matches = self.embedding_lookuptable.iloc[dynamicfric_match_indices.flatten()][[0, 1]]
+        dynamicfric_matches_np= dynamicfric_matches.to_numpy()
+
+        dynamicfric_matches_normalized_np = (dynamicfric_matches_np - self.min_value_global) / (self.max_value_global - self.min_value_global)
+
+        # print("This should be all sameeeee")
+        # print(dynamicfric_matches_normalized_np)
+
+        dynamicfric_matches_tensor = torch.from_numpy(dynamicfric_matches_normalized_np).to(self.device)
+
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), dynamicfric_matches_tensor), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
 
         observations = {"policy": obs}
 
@@ -552,7 +612,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         curr_success_rate = self.extras.get('log')
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.051 and self.curriculum_count>self.max_episode_length: 
+            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
                 self.goal_threshold -= 0.05
                 print(self.goal_threshold)
                 # self.rew_scale_goal += 5

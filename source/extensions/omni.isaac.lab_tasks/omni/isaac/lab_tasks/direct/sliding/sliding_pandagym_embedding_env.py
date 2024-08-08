@@ -35,6 +35,7 @@ import pickle
 import source.offline_learning.model.VAE as vaemodel
 import torch.optim as optim
 import torch.nn as nn
+from sklearn.neighbors import NearestNeighbors
 
 import time
 
@@ -251,9 +252,10 @@ class SlidingPandaGymEmbeddingEnv(DirectRLEnv):
         # Embeddings
         embedding_lookuptable_path = "/workspace/isaaclab/logs/exp_lookuptable/predefined/dynamicfriction_z2.pkl"
         with open(embedding_lookuptable_path, "rb") as fp: 
-            embedding_lookuptable = pickle.load(fp)
+            self.embedding_lookuptable = pickle.load(fp)
 
-        print(embedding_lookuptable.shape) 
+        print(self.embedding_lookuptable.shape) 
+
         
         # model_params_path = "/workspace/isaaclab/logs/exp_model/exploration_sslmodel_params_dict.pkl"
         # with open(model_params_path, "rb") as fp: 
@@ -451,6 +453,21 @@ class SlidingPandaGymEmbeddingEnv(DirectRLEnv):
         # print("Current materislaaass")
         # print(com_z)
         # torch.Size([32, 1, 3])
+
+        # Embeddings
+        print("Dynamic Frictionsssss: should be (32,1)")
+        dynamic_frictions_np = dynamic_frictions.cpu().detach().numpy().reshape(self.num_envs, -1)
+        print(dynamic_frictions_np.shape)
+        print(self.embedding_lookuptable[['dynamic friction']].shape)
+
+        neigh_dynamicfric = NearestNeighbors(n_neighbors=1)
+        neigh_dynamicfric.fit(self.embedding_lookuptable[['dynamic friction']].to_numpy())
+
+        dynamicfric_match_indices = neigh_dynamicfric.kneighbors(dynamic_frictions_np, return_distance=False)
+        print("Look up table")
+        print(self.embedding_lookuptable)
+        dynamicfric_matches = self.embedding_lookuptable.iloc[dynamicfric_match_indices.flatten()][[0, 1]]
+        dynamicfric_matches_np= dynamicfric_matches.to_numpy()
 
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
