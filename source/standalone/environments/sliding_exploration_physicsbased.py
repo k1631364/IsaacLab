@@ -111,13 +111,16 @@ def main():
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
-            pusher_velocity = -2.5 #(Working initially)
+            # pusher_velocity = -2.5 #(Working initially)
             # pusher_velocity = -3.0
+            fric = 0.2
+            fric = (fric+0.1)/2.0
+            pusher_velocity = -np.sqrt(2*fric*9.81*(1.7+1.75)) # -2.38 for 0.1 # v = np.sqrt(2*0.2*9.81*(1.3-0.75))
             # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
 
-            if infos == {}:
+            if infos == {}: 
                 print("Noneeeee")
             else:
                 mask = infos["two_phase"]["episode_length_buf"] > 0

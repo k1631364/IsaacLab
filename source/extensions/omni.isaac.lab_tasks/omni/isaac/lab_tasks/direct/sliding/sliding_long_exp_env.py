@@ -39,7 +39,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.1, 0.1),
+          "dynamic_friction_range": (0.2, 0.2),
           "restitution_range": (1.0, 1.0),
           "com_range_x": (0.00, 0.00), 
           "com_range_y": (0.00, 0.00),
@@ -47,7 +47,26 @@ class EventCfg:
           "num_buckets": 250,
       },
   )
-#    [0.1, 0.2, 0.1],
+
+#   robot_physics_material2 = EventTerm(
+#       func=mdp.randomize_rigid_body_material,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("cuboidtable2"),
+#           "static_friction_range": (0.5, 0.5),
+#           "dynamic_friction_range": (0.00, 0.00),
+#           "restitution_range": (1.0, 1.0),
+#           "com_range_x": (0.00, 0.00), 
+#           "com_range_y": (0.00, 0.00),
+#           "com_range_z": (0.0, 0.0),
+#           "num_buckets": 250,
+#       },
+#   )
+
+  # Rigid object default properties are [0.5000, 0.5000, 0.0000]
+  # self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_coms()
+  # self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_material_properties
+  # [0.1, 0.2, 0.1]
 
 @configclass
 class SlidingLongExpEnvCfg(DirectRLEnvCfg):

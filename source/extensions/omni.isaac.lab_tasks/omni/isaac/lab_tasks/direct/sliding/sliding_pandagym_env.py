@@ -43,7 +43,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.3),
+          "dynamic_friction_range": (0.1, 0.1),
           "restitution_range": (1.0, 1.0),
           "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
           "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
@@ -119,12 +119,28 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     # )
 
     # Pusher
+    # pusher_length = 0.03
+    # pusher_default_pos = 1.3
+    # cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/cuboidpusher2",
+    #     spawn=sim_utils.SphereCfg(
+    #         radius=pusher_length, 
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         activate_contact_sensors=True, 
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
+    # )
+
     pusher_length = 0.03
     pusher_default_pos = 1.3
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
-        spawn=sim_utils.SphereCfg(
+        spawn=sim_utils.CylinderCfg(
             radius=pusher_length, 
+            height = 0.05, 
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -233,7 +249,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # Goal randomisation range
         self.goal_location_min = 0.5
         self.goal_location_max = 0.9
-        self.discrete_goals = torch.tensor([0.75], device=self.device)
+        self.discrete_goals = torch.tensor([0.25], device=self.device)
         self.discrete_goal = True
         
         # Normalisaion range: goal
