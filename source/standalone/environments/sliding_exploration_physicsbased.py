@@ -113,10 +113,13 @@ def main():
             # sample actions from -1 to 1
             # pusher_velocity = -2.5 #(Working initially)
             # pusher_velocity = -3.0
-            fric = 0.2
-            fric = (fric+0.1)/2.0
-            pusher_velocity = -np.sqrt(2*fric*9.81*(1.7+1.75)) # -2.38 for 0.1 # v = np.sqrt(2*0.2*9.81*(1.3-0.75))
-            # pusher_velocity_tensor = torch.tensor(pusher_velocity, device=env.unwrapped.device).clone()
+            fric = (0.05+0.3)/2.0
+            mass_puck = 1.0
+            mass_pusher = 1.0
+            pusher_velocity = -np.sqrt(2*fric*9.81*(1.7-(0.25))) * (mass_puck/mass_pusher)
+            # pusher_velocity = (-np.sqrt(2*fric*9.81*(1.7-(-0.75))) * mass_puck)/mass_pusher 
+            # pusher_velocity = (-np.sqrt(2*fric*9.81*(1.7-(-0.75))) * (mass_puck+mass_pusher))/(2.0*mass_pusher)
+            # pusher_velocity = 0.0
             pusher_velocity_tensor = torch.full((env.num_envs, 1), pusher_velocity, device=env.unwrapped.device)
             actions = pusher_velocity_tensor.reshape((-1,1))
 

@@ -38,9 +38,37 @@ class EventCfg:
       mode="reset",
       params={
           "asset_cfg": SceneEntityCfg("cuboidpuck2"),
-          "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.2, 0.2),
-          "restitution_range": (1.0, 1.0),
+          "static_friction_range": (0.8, 0.8),
+          "dynamic_friction_range": (0.05, 0.05),
+          "restitution_range": (0.0, 0.0),
+          "com_range_x": (0.00, 0.00), 
+          "com_range_y": (0.00, 0.00),
+          "com_range_z": (0.0, 0.0),
+          "num_buckets": 250,
+      },
+  )
+  robot_physics_material2 = EventTerm(
+      func=mdp.randomize_rigid_body_material,
+      mode="reset",
+      params={
+          "asset_cfg": SceneEntityCfg("cuboidtable2"),
+          "static_friction_range": (0.8, 0.8),
+          "dynamic_friction_range": (0.3, 0.3),
+          "restitution_range": (0.0, 0.0),
+          "com_range_x": (0.00, 0.00), 
+          "com_range_y": (0.00, 0.00),
+          "com_range_z": (0.0, 0.0),
+          "num_buckets": 250,
+      },
+  )
+  robot_physics_material3 = EventTerm(
+      func=mdp.randomize_rigid_body_material,
+      mode="reset",
+      params={
+          "asset_cfg": SceneEntityCfg("cuboidpusher2"),
+          "static_friction_range": (1.0, 1.0),
+          "dynamic_friction_range": (1.0, 1.0),
+          "restitution_range": (0.0, 0.0),
           "com_range_x": (0.00, 0.00), 
           "com_range_y": (0.00, 0.00),
           "com_range_z": (0.0, 0.0),
@@ -48,20 +76,11 @@ class EventCfg:
       },
   )
 
-#   robot_physics_material2 = EventTerm(
-#       func=mdp.randomize_rigid_body_material,
-#       mode="reset",
-#       params={
-#           "asset_cfg": SceneEntityCfg("cuboidtable2"),
-#           "static_friction_range": (0.5, 0.5),
-#           "dynamic_friction_range": (0.00, 0.00),
-#           "restitution_range": (1.0, 1.0),
-#           "com_range_x": (0.00, 0.00), 
-#           "com_range_y": (0.00, 0.00),
-#           "com_range_z": (0.0, 0.0),
-#           "num_buckets": 250,
-#       },
-#   )
+  # pusher_velocity = -np.sqrt(2*fric*9.81*(1.7-0.25)) works for puck velocity when 
+  # "static_friction_range": (0.5, 0.5),
+  # "dynamic_friction_range": (0.1, 0.1),
+  # "restitution_range": (0.0, 0.0), 
+
 
   # Rigid object default properties are [0.5000, 0.5000, 0.0000]
   # self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_coms()
@@ -98,7 +117,7 @@ class SlidingLongExpEnvCfg(DirectRLEnvCfg):
         spawn=sim_utils.CuboidCfg(
             size = [puck_length, 0.2, 0.1], 
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
@@ -216,7 +235,7 @@ class SlidingLongExpEnv(DirectRLEnv):
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         
         # Goal randomisation range
-        self.goal_location_min = 0.25
+        self.goal_location_min = -1.75
         self.goal_location_max = 0.75
         self.discrete_goals = torch.tensor([0.25], device=self.device)
         self.discrete_goal = True
@@ -498,6 +517,7 @@ class SlidingLongExpEnv(DirectRLEnv):
         # print(self.episode_length_buf)
         # print(self.max_episode_length)
 
+        # return out_of_bounds, time_out, self.goal_bounds, episode_failed
         return false_tensor, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
@@ -542,7 +562,23 @@ class SlidingLongExpEnv(DirectRLEnv):
             cuboidpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
         )
         cuboidpuck2_default_state[:, 7:] = torch.zeros_like(self.cuboidpuck2.data.default_root_state[env_ids, 7:])
-        # cuboidpuck2_default_state[:, 7] = -2.5
+        # # Physics-based motion
+        # # cuboidpuck2_default_state[:, 7] = -2.385 # -2.921 # -1.686
+        # # Friction
+        # curr_materials = self.scene.rigid_objects["cuboidpuck2"].root_physx_view.get_material_properties()
+        # static_frictions = curr_materials.squeeze().reshape((-1,3))[:,0].to(self.scene.env_origins.device)
+        # dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
+        # restitutions = curr_materials.squeeze().reshape((-1,3))[:,2].to(self.scene.env_origins.device)
+        # avg_dynamic_frictions_np = (dynamic_frictions[env_ids].cpu().detach().numpy() + 0.3)/2.0
+        # # Goal
+        # goal_locations_np = self.goal_locations[env_ids, 0].cpu().detach().numpy()
+        # # Physics-based init vel. 
+        # init_vel_np = -np.sqrt(2*avg_dynamic_frictions_np*9.81*(1.7-goal_locations_np)) 
+        # init_vel_tensor = torch.from_numpy(init_vel_np).to(self.device)
+        # cuboidpuck2_default_state[:, 7] = init_vel_tensor
+        # # fric = 0.2
+        # # cuboidpuck2_default_state[:, 7] = -np.sqrt(2*fric*9.81*(1.7-0.25)) 
+        # # End physics-based motion computation
         self.cuboidpuck2_state[env_ids] = cuboidpuck2_default_state.clone()
         self.cuboidpuck2.write_root_state_to_sim(cuboidpuck2_default_state, env_ids)
 
