@@ -45,8 +45,8 @@ class EventCfg:
           "static_friction_range": (0.05, 0.05),
           "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),
-          "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
-          "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
+          "com_range_x": (-0.02, 0.02), # (-0.02, 0.02),
+          "com_range_y": (-0.02, 0.02), # (-0.02, 0.02),
           "com_range_z": (0.0, 0.0),
           "num_buckets": 250,
       },
@@ -192,7 +192,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 2.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 11
+    num_observations = 12
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -236,7 +236,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.prev_puck_vel = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
         self.prev_puck_acc = torch.zeros_like(self.prev_puck_vel)
         
-        # Goal location tensor tracking
+        # Goal location tensor tracking (goal shape = (num_envs, 3))
         init_goal_location = torch.tensor([self.cfg.goal_location, 0.0, 1.0], device=self.scene.env_origins.device)
         self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
 
@@ -249,7 +249,9 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # Goal randomisation range
         self.goal_location_min = 0.5
         self.goal_location_max = 0.9
-        self.discrete_goals = torch.tensor([0.75], device=self.device)
+        self.discrete_goals = torch.tensor([0.25, 0.75], device=self.device)
+        # self.discrete_goals_x = torch.tensor([0.75], device=self.device)
+        # self.discrete_goals_y = torch.tensor([0.75], device=self.device)
         self.discrete_goal = True
         
         # Normalisaion range: goal
@@ -531,9 +533,9 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), static_frictions.view(-1,1), dynamic_frictions.view(-1,1), restitutions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), dynamicfric_matches_tensor), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), dynamicfric_matches_tensor), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
 
         observations = {"policy": obs}
