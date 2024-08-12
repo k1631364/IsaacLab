@@ -247,20 +247,28 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.goal_threshold = 0.2
         
         # Goal randomisation range
-        self.goal_location_min = 0.5
-        self.goal_location_max = 0.9
+        self.goal_location_min = 0.9
+        self.goal_location_min_x = 0.75 # 0.25
+        self.goal_location_min_y = -0.3
+        self.goal_location_max = 0.25
+        self.goal_location_max_x = 0.75 # 0.9
+        self.goal_location_max_y = 0.3
         self.discrete_goals = torch.tensor([0.25], device=self.device)
         # self.discrete_goals_x = torch.tensor([0.75], device=self.device)
         # self.discrete_goals_y = torch.tensor([0.75], device=self.device)
-        self.discrete_goal = True
+        self.discrete_goal = False
         
         # Normalisaion range: goal
-        self.goal_location_normmax = 2.0
-        self.goal_location_normmin = -2.0
+        self.goal_location_normmax = [0.9, 0.3]
+        self.goal_location_normmin = [0.25, -0.3]
+        # self.goal_location_normmax = 1.0
+        # self.goal_location_normmin = -2.0
         
         # Normalisaion range: object
-        self.object_location_normmax = self.goal_location_normmax
-        self.object_location_normmin = self.goal_location_normmin
+        # self.object_location_normmax = self.goal_location_normmax
+        # self.object_location_normmin = self.goal_location_normmin
+        self.object_location_normmax = 2.0
+        self.object_location_normmin = -2.0
         self.object_vel_normmax = 4.0
         self.object_vel_normmin = -4.0
 
@@ -478,8 +486,15 @@ class SlidingPandaGymEnv(DirectRLEnv):
         normalized_past_puck_vel_obs  = past_puck_vel_tensor
         
         # Goal
-        goal_tensor = self.goal_locations[:,0].clone()
-        normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
+        # goal_tensor = self.goal_locations[:,0].clone()
+        goal_tensor = self.goal_locations[:,[0,1]].clone()
+        min_vals = torch.tensor(self.goal_location_normmin).to(self.device)
+        max_vals = torch.tensor(self.goal_location_normmax).to(self.device)
+        # self.goal_location_normmin = torch.FloatTensor(self.goal_location_normmin).to(self.device)
+        # self.goal_location_normmax = torch.FloatTensor(self.goal_location_normmax).to(self.device)
+        normalized_goal_tensor = (goal_tensor - min_vals) / (max_vals - min_vals)
+        # print(normalized_goal_tensor)
+        normalized_goal_tensor = normalized_goal_tensor[:,1]
 
         # Friction
         curr_materials = self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_material_properties()
@@ -528,6 +543,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
 
         dynamicfric_matches_tensor = torch.from_numpy(dynamicfric_matches_normalized_np).to(self.device)
 
+        # each obs shape = (num_envs, num_feature)
+
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
@@ -536,6 +553,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), dynamicfric_matches_tensor), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 2), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs[:,:,0].T, normalized_past_puck_pos_obs[:,:,1].T, normalized_past_puck_vel_obs[:,:,0].T, normalized_past_puck_vel_obs[:,:,1].T, normalized_past_pusher_pos_obs[:,:,0].T, normalized_past_pusher_pos_obs[:,:,1].T, normalized_past_pusher_vel_obs[:,:,0].T, normalized_past_pusher_vel_obs[:,:,1].T, normalized_goal_tensor.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
 
         observations = {"policy": obs}
@@ -631,20 +649,20 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print("Euclid distance")
         # print(euclid_distance)
 
-        # Reset goal
-        curr_success_rate = self.extras.get('log')
-        if curr_success_rate is not None: 
-            # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
-                self.goal_threshold -= 0.05
-                print(self.goal_threshold)
-                # self.rew_scale_goal += 5
-                # self.success_threshold += 0.1
-                # self.goal_length -= 0.1 
-                self.curriculum_count = 0
-                pass
-            else:
-                self.curriculum_count+=1
+        # # Reset goal
+        # curr_success_rate = self.extras.get('log')
+        # if curr_success_rate is not None: 
+        #     # print(curr_success_rate["success_rate"])  
+        #     if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
+        #         self.goal_threshold -= 0.05
+        #         print(self.goal_threshold)
+        #         # self.rew_scale_goal += 5
+        #         # self.success_threshold += 0.1
+        #         # self.goal_length -= 0.1 
+        #         self.curriculum_count = 0
+        #         pass
+        #     else:
+        #         self.curriculum_count+=1
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
@@ -727,13 +745,17 @@ class SlidingPandaGymEnv(DirectRLEnv):
             random_indices = torch.randint(len(self.discrete_goals), size=(len(env_ids),), device=self.device)
             goal_noise = self.discrete_goals[random_indices]
         else:
-            goal_noise = sample_uniform(self.goal_location_max, self.goal_location_min, (len(env_ids)), device=self.device)
+            # goal_noise = sample_uniform(self.goal_location_max, self.goal_location_min, (len(env_ids)), device=self.device)
+            goal_noise_x = sample_uniform(self.goal_location_min_x, self.goal_location_max_x, (len(env_ids)), device=self.device)
+            goal_noise_y = sample_uniform(self.goal_location_min_y, self.goal_location_max_y, (len(env_ids)), device=self.device)
         goal_pos_offset = self.goal_locations.clone()
-        goal_pos_offset[env_ids, 0] = goal_noise
+        # goal_pos_offset[env_ids, 0] = goal_noise
+        goal_pos_offset[env_ids, 0] = goal_noise_x
+        goal_pos_offset[env_ids, 1] = goal_noise_y
 
         self.goal_locations = goal_pos_offset.clone()
-        self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
-        self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
+        # self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
+        # self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         goal_pos_offset = goal_pos_offset.to(self.scene.env_origins.device)
 
         goal_pos = self.scene.env_origins + goal_pos_offset
