@@ -190,7 +190,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
 
     decimation = 5
     episode_length_s = 2.0
-    action_scale = 1.0
+    action_scale = 3.0
     num_actions = 2 # action dim
     num_observations = 12
     num_states = 2
@@ -244,12 +244,12 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.success_threshold = 0.2
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        self.goal_threshold = 0.15
+        self.goal_threshold = 0.2
         
         # Goal randomisation range
         self.goal_location_min = 0.5
         self.goal_location_max = 0.9
-        self.discrete_goals = torch.tensor([0.25, 0.75], device=self.device)
+        self.discrete_goals = torch.tensor([0.25], device=self.device)
         # self.discrete_goals_x = torch.tensor([0.75], device=self.device)
         # self.discrete_goals_y = torch.tensor([0.75], device=self.device)
         self.discrete_goal = True
