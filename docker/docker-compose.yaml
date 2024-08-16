@@ -71,12 +71,12 @@ x-default-isaac-lab-environment: &default-isaac-lab-environment
 x-default-isaac-lab-deploy: &default-isaac-lab-deploy
   resources:
     limits:
-      cpus: "48"              # number of cores
+      cpus: "16"              # number of cores
       memory: 64g           # limit container usage
     reservations:
       devices:
         - driver: nvidia
-          device_ids: ["1"]  # specify the GPU ID here if necessary
+          device_ids: ["0"]  # specify the GPU ID here if necessary
           capabilities: [ gpu ]
 
 services:

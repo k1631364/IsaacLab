@@ -156,6 +156,9 @@ def main():
     # https://skrl.readthedocs.io/en/latest/api/memories/random.html
     memory_size = experiment_cfg["agent"]["rollouts"]  # memory_size is the agent's number of rollouts
     memory = RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
+    # Memory to save all transitions
+    max_episode_length = env.unwrapped.max_episode_length
+    memory_all = RandomMemory(memory_size=max_episode_length*100, num_envs=env.num_envs, device=env.device)
 
     # configure and instantiate PPO agent
     # https://skrl.readthedocs.io/en/latest/api/agents/ppo.html
@@ -172,6 +175,7 @@ def main():
         observation_space=env.observation_space,
         action_space=env.action_space,
         device=env.device,
+        memory_all=memory_all, 
     )
 
     # configure and instantiate a custom RL trainer for logging episode events
@@ -183,6 +187,9 @@ def main():
 
     # train the agent
     trainer.train()
+
+    # memory_path = os.path.join(log_dir, "memory", "ppo_memory.pt")
+    # agent.memory.save(memory_path)
     
     print(f"[INFO] Logging experiment in directory: {log_dir}")
     checkpoint_path = os.path.join(log_dir, "checkpoints", "best_agent.pt")

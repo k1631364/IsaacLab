@@ -17,6 +17,8 @@ import argparse
 
 from omni.isaac.lab.app import AppLauncher
 
+from datetime import datetime
+
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
 parser.add_argument("--cpu", action="store_true", default=False, help="Use CPU pipeline.")
@@ -124,6 +126,11 @@ def main():
     else:
         resume_path = get_checkpoint_path(log_root_path, other_dirs=["checkpoints"])
     print(f"[INFO] Loading model checkpoint from: {resume_path}")
+    
+    print(log_root_path)
+    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if experiment_cfg["agent"]["experiment"]["experiment_name"]:
+        log_dir += f'_{experiment_cfg["agent"]["experiment"]["experiment_name"]}'
 
     # initialize agent
     agent.init()
@@ -184,8 +191,10 @@ def main():
                 wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env})
                 prev_total_episode_num = total_episode_num 
 
-
-
+            # print(total_episode_num)
+            # if total_episode_num == 100:
+            #     memory_path = os.path.join(log_dir, "memory", "ppo_memory.pt")
+            #     agent.memory.save(memory_path)
 
     # close the simulator
     env.close()

@@ -233,6 +233,9 @@ class SkrlSequentialLogTrainer(Trainer):
             # update states
             states.copy_(next_states)
 
+        print(self.agents.memory)
+        self.agents.memory.save("hello.pt")
+
     def eval(self) -> None:
         """Evaluate the agents sequentially.
 
