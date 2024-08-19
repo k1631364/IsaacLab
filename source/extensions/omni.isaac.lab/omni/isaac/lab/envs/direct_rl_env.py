@@ -352,6 +352,9 @@ class DirectRLEnv(gym.Env):
         else:
             self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf}
 
+        if "prop" in self.obs_buf: 
+            self.extras["prop"] = self.obs_buf['prop']
+
         # print("Episode curr step")
         # print(self.episode_length_buf)
 

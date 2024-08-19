@@ -193,7 +193,10 @@ def main():
     
     print(f"[INFO] Logging experiment in directory: {log_dir}")
     checkpoint_path = os.path.join(log_dir, "checkpoints", "best_agent.pt")
-    print(f"Checkpoint: {checkpoint_path}")
+    print(f"Checkpoint: {checkpoint_path}")#
+    
+    # print(agent.memory)
+    # agent.memory.save(memory_path)
 
     # close the simulator
     env.close()

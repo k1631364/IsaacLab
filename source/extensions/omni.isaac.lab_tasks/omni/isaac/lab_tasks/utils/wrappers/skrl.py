@@ -232,10 +232,7 @@ class SkrlSequentialLogTrainer(Trainer):
             # note: here we do not call reset scene since it is done in the env.step() method
             # update states
             states.copy_(next_states)
-
-        print(self.agents.memory)
-        self.agents.memory.save("hello.pt")
-
+            
     def eval(self) -> None:
         """Evaluate the agents sequentially.
 
