@@ -145,12 +145,12 @@ def main():
     # logs/exp_data/predefined_slide/2024-08-06_09-53-14/test.hdf5
 
     # Fig file path (to save)
-    log_fig_dir = os.path.join("logs", "prop_estimation", "offline_prop_estimation")
+    log_fig_dir = os.path.join(log_dir, "figure")
     if not os.path.exists(log_fig_dir):
         os.makedirs(log_fig_dir)
 
     # Model path (to save)
-    log_model_dir = os.path.join("logs", "prop_estimation", "offline_prop_estimation")
+    log_model_dir = os.path.join(log_dir, "model")
     if not os.path.exists(log_model_dir):
         os.makedirs(log_model_dir)
 
@@ -340,7 +340,7 @@ def main():
     hidden_size = 64    # Number of features in hidden state
     num_layers = 1      # Number of LSTM layers
     output_size = 1     # Number of physical properties (e.g., friction, CoM)
-    num_epochs = 1000
+    num_epochs = 500
     learning_rate = 0.001
 
     model = RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
@@ -375,6 +375,22 @@ def main():
     model_path = log_model_dir + "/LSTM_best.pth"
     torch.save(model.to(torch_device).state_dict(), model_path)
 
+    model_params_dict = {
+        "input_size": input_size, 
+        "hidden_size": hidden_size, 
+        "num_layers": num_layers, 
+        "output_size": output_size, 
+        "num_epochs": num_epochs, 
+        "learning_rate": learning_rate, 
+        "model": model, 
+        "criterion": criterion, 
+        "optimizer": optimizer, 
+        "model_path": model_path, 
+    }
+    model_params_path = log_model_dir + "/model_params_dict.pkl"
+    with open(model_params_path, "wb") as fp: 
+        pickle.dump(model_params_dict, fp)
+
     # /workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/LSTM_best.pth
 
     # Eval
@@ -401,6 +417,7 @@ def main():
                 # print(f"Label shape: {target.shape}")
 
                 # Forward pass
+                # Input size torch.Size([1, 20, 4])
                 output = model(input)
                 loss = criterion(output, target)
 
