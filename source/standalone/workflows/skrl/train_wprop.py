@@ -61,9 +61,7 @@ from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
-
-# from source.offline_learning.model import RNNPropertyEstimator 
-# import source.offline_learning.model.RNNPropertyEstimator as rnnmodel
+# source/skrl/agents/torch/ppo/ppo_rnn_prop.py
 
 # Test comment (Working)
 def main():

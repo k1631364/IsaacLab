@@ -37,6 +37,7 @@ import torch.nn as nn
 import pickle
 
 import model.VAE as vaemodel
+import model.RNNPropertyEstimator as rnnmodel
 
 # from skrl.resources.preprocessors.torch import RunningStandardScaler
 
@@ -90,37 +91,37 @@ class LSTMPropertyEstimator(nn.Module):
         return out
     
 
-class RNNPropertyEstimator(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
-        super(RNNPropertyEstimator, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+# class RNNPropertyEstimator(nn.Module):
+#     def __init__(self, input_size, hidden_size, num_layers, output_size):
+#         super(RNNPropertyEstimator, self).__init__()
+#         self.hidden_size = hidden_size
+#         self.num_layers = num_layers
         
-        # Define the RNN layer
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
+#         # Define the RNN layer
+#         self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
         
-        # Define a fully connected layer to output the estimated properties
-        self.fc = nn.Linear(hidden_size, output_size)
+#         # Define a fully connected layer to output the estimated properties
+#         self.fc = nn.Linear(hidden_size, output_size)
 
-        # Sigmoid activation for output normalization to [0, 1]
-        self.output_activation = nn.Sigmoid()
+#         # Sigmoid activation for output normalization to [0, 1]
+#         self.output_activation = nn.Sigmoid()
     
-    def forward(self, x):
-        # Initialize hidden state
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+#     def forward(self, x):
+#         # Initialize hidden state
+#         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         
-        # Forward propagate the RNN
-        out, _ = self.rnn(x, h0)  # out: tensor of shape (batch_size, seq_length, hidden_size)
+#         # Forward propagate the RNN
+#         out, _ = self.rnn(x, h0)  # out: tensor of shape (batch_size, seq_length, hidden_size)
         
-        # Use the last time step's output for property estimation
-        out = out[:, -1, :]  # (batch_size, hidden_size)
+#         # Use the last time step's output for property estimation
+#         out = out[:, -1, :]  # (batch_size, hidden_size)
         
-        # Pass through the fully connected layer
-        out = self.fc(out)  # (batch_size, output_size)
+#         # Pass through the fully connected layer
+#         out = self.fc(out)  # (batch_size, output_size)
 
-        out = self.output_activation(out)
+#         out = self.output_activation(out)
 
-        return out
+#         return out
 
 def main():
 
@@ -300,7 +301,14 @@ def main():
     print(chunked_data.shape)
     print(chunked_label.shape)
 
+    time.sleep(300)
+
     ### Remove data containing episode termination ###
+    first_one_idx = (chunked_data[:,:,-1] == 1).int().argmax(dim=1)
+    print(first_one_idx)
+
+
+
     last_column = chunked_data[:, :, -1]
     mask = (last_column != 1).all(dim=1)
     filtered_data = chunked_data[mask]
@@ -343,7 +351,7 @@ def main():
     num_epochs = 500
     learning_rate = 0.001
 
-    model = RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
+    model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -382,10 +390,21 @@ def main():
         "output_size": output_size, 
         "num_epochs": num_epochs, 
         "learning_rate": learning_rate, 
-        "model": model, 
         "criterion": criterion, 
         "optimizer": optimizer, 
         "model_path": model_path, 
+        "state_min": state_min, 
+        "state_max": state_max, 
+        "state_range_min": state_range_min, 
+        "state_range_max": state_range_max, 
+        "dynamic_fric_min": dynamic_fric_min, 
+        "dynamic_fric_max": dynamic_fric_max, 
+        "comx_min": comx_min, 
+        "comx_max": comx_max, 
+        "comy_min": comy_min, 
+        "comy_max": comy_max, 
+        "target_range_min": target_range_min, 
+        "target_range_max": target_range_max, 
     }
     model_params_path = log_model_dir + "/model_params_dict.pkl"
     with open(model_params_path, "wb") as fp: 
@@ -417,7 +436,8 @@ def main():
                 # print(f"Label shape: {target.shape}")
 
                 # Forward pass
-                # Input size torch.Size([1, 20, 4])
+                # Input size torch.Size([1, 20, 4]) [batch_size, , seq_length, 4]
+                # Output size torch.Size([1, 1])    [batch_size, 1]
                 output = model(input)
                 loss = criterion(output, target)
 

@@ -34,6 +34,7 @@ from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 import pickle
 from sklearn.neighbors import NearestNeighbors
 
+import source.offline_learning.model.RNNPropertyEstimator as rnnmodel
 
 @configclass
 class EventCfg:
@@ -44,13 +45,33 @@ class EventCfg:
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
           "dynamic_friction_range": (0.05, 0.3),
-          "restitution_range": (1.0, 1.0),
-          "com_range_x": (-0.02, 0.02), # (-0.02, 0.02),
-          "com_range_y": (-0.02, 0.02), # (-0.02, 0.02),
-          "com_range_z": (0.0, 0.0),
+          "restitution_range": (0.4, 0.4),  # (1.0, 1.0),  
+          "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
+          "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
+          "com_range_z": (0.0, 0.0), 
+          "mass_range": (0.15, 0.15),
           "num_buckets": 250,
       },
   )
+
+  robot_physics_material2 = EventTerm(
+      func=mdp.randomize_rigid_body_material,
+      mode="reset",
+      params={
+          "asset_cfg": SceneEntityCfg("cuboidpusher2"),
+          "static_friction_range": (0.5, 0.5),
+          "dynamic_friction_range": (0.5, 0.5),
+          "restitution_range": (0.4, 0.6),
+        #   "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
+        #   "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
+        #   "com_range_z": (0.0, 0.0), 
+          "mass_range": (0.5, 3.0),
+          "num_buckets": 250,
+      },
+  )
+  
+  # Default material proeprties tensor([[[0.5000, 0.5000, 0.0000]]])
+  # Juan's pushing randomisation: distribution_parameters: [[0.5, 0.2, 0.4], [0.7, 0.4, 0.6]]
 
 @configclass
 class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
@@ -71,9 +92,9 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     # )
 
     obs_pos_noise_mean = 0.0
-    obs_pos_noise_std = 0.0025  # sigma = 0.0025m = 2.5mm
+    obs_pos_noise_std = 0.0005 # 0.0025  # sigma = 0.0025m = 2.5mm
     obs_vel_noise_mean = 0.0
-    obs_vel_noise_std = 0.06  # sigma = 0.06m/s
+    obs_vel_noise_std = 0.02 # 0.06  # sigma = 0.06m/s
 
     # Table
     table_length = 4.0
@@ -91,15 +112,15 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     )
 
     # Puck
-    puck_length = 0.05
-    puck_default_pos = 1.2
+    puck_length = 0.032
+    puck_default_pos = 1.1
     cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cylinderpuck2",
         spawn=sim_utils.CylinderCfg(
             radius = puck_length, 
             height = 0.05, 
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.15),  # mass=0.23
             collision_props=sim_utils.CollisionPropertiesCfg(),
             activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
@@ -108,8 +129,8 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     )
 
     # # Pusher
-    # pusher_length = 0.1
-    # pusher_default_pos = 1.4
+    # pusher_length = 0.026 # 0.1
+    # pusher_default_pos = 1.2 # 1.4
     # cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
     #     prim_path="/World/envs/env_.*/cuboidpusher2",
     #     spawn=sim_utils.CuboidCfg(
@@ -139,8 +160,8 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     #     init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
     # )
 
-    pusher_length = 0.03
-    pusher_default_pos = 1.3
+    pusher_length = 0.013
+    pusher_default_pos = 1.2
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.SphereCfg(
@@ -173,12 +194,12 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     )
 
     # Start region
-    max_pusher_posx_bound = 2.0  # the cart is reset if it exceeds that position [m]
+    max_pusher_posx_bound = 1.25  # the cart is reset if it exceeds that position [m]
     min_pusher_posx_bound = 1.0  # the cart is reset if it exceeds that position [m]
     max_pusher_posx = max_pusher_posx_bound-(pusher_length/2.0)  # the cart is reset if it exceeds that position [m] (0.95)
     min_pusher_posx = min_pusher_posx_bound+(pusher_length/2.0)   # the cart is reset if it exceeds that position [m] (0.05)
-    max_pusher_posy_bound = 0.5  # the cart is reset if it exceeds that position [m]
-    min_pusher_posy_bound = -0.5  # the cart is reset if it exceeds that position [m]
+    max_pusher_posy_bound = 0.3  # the cart is reset if it exceeds that position [m]
+    min_pusher_posy_bound = -0.3  # the cart is reset if it exceeds that position [m]
     min_pusher_posy = min_pusher_posy_bound+(pusher_length/2.0)   # the cart is reset if it exceeds that position [m] (0.05)
     max_pusher_posy = max_pusher_posy_bound-(pusher_length/2.0)  # the cart is reset if it exceeds that position [m] (0.95)
     start_length = abs(max_pusher_posx_bound - min_pusher_posx_bound)
@@ -260,26 +281,26 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = -0.5
+        self.goal_location_min_x = -0.0
         self.goal_location_max_x = 0.75
-        self.goal_location_min_y = -0.3
-        self.goal_location_max_y = 0.3
-        self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0, -0.25, -0.5], device=self.device)
-        self.discrete_goals_x = torch.tensor([0.75, 0.5, 0.25, 0.0, -0.25, -0.5], device=self.device)
+        self.goal_location_min_y = -0.2
+        self.goal_location_max_y = 0.2
+        self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
+        self.discrete_goals_x = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_y = torch.tensor([0.3, 0.0, -0.3], device=self.device)
         self.discrete_goal = False
         
         # Normalisaion range: goal
         # self.goal_location_normmax = 2.0
         # self.goal_location_normmin = -2.0
-        self.goal_location_normmax = 0.75
-        self.goal_location_normmin = -0.5
+        self.goal_location_normmax = 1.5
+        self.goal_location_normmin = -1.5
         
         # Normalisaion range: object
         # self.object_location_normmax = self.goal_location_normmax
         # self.object_location_normmin = self.goal_location_normmin
-        self.object_location_normmax = 2.0
-        self.object_location_normmin = -2.0
+        self.object_location_normmax = 1.5
+        self.object_location_normmin = -1.5
         self.object_vel_normmax = 4.0
         self.object_vel_normmin = -4.0
 
@@ -328,6 +349,28 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(self.max_value_global)
 
         # print(self.embedding_lookuptable.shape) 
+
+        # Prop estimation
+        prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-08-20_13-18-59/model/model_params_dict.pkl"
+        with open(prop_estimator_dict_path, "rb") as fp: 
+            self.prop_estimator_dict = pickle.load(fp)
+        print(self.prop_estimator_dict)
+
+        rnn_input_size = self.prop_estimator_dict["input_size"]
+        rnn_hidden_size = self.prop_estimator_dict["hidden_size"]
+        rnn_num_layers = self.prop_estimator_dict["num_layers"]
+        rnn_output_size = self.prop_estimator_dict["output_size"]
+
+        self.rnn_prop_model = rnnmodel.RNNPropertyEstimator(rnn_input_size, rnn_hidden_size, rnn_num_layers, rnn_output_size).to(self.scene.env_origins.device)
+
+        # Load the learnt model
+        self.rnn_prop_model.load_state_dict(torch.load(self.prop_estimator_dict["model_path"], map_location=torch.device(self.scene.env_origins.device)))
+        self.rnn_prop_model.eval()
+
+        self.state_min = self.prop_estimator_dict["state_min"]
+        self.state_max = self.prop_estimator_dict["state_max"]
+        self.state_range_min = self.prop_estimator_dict["state_range_min"]
+        self.state_range_max = self.prop_estimator_dict["state_range_max"]
 
         self.obs_pos_noise_epi = torch.normal(self.cfg.obs_pos_noise_mean, self.cfg.obs_pos_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
         self.obs_vel_noise_epi = torch.normal(self.cfg.obs_vel_noise_mean, self.cfg.obs_vel_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
@@ -384,7 +427,10 @@ class SlidingPandaGymEnv(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
+        self.actions[self.actions < -2.0] = -2.0
         # print(self.actions.shape)
+        # print("Action vel")
+        # print(self.actions)
         # pass
 
     def _apply_action(self) -> None:
@@ -536,6 +582,12 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(com_z)
         # torch.Size([32, 1, 3])
 
+        # print("dynamic_frictions")
+        # print(dynamic_frictions)
+        # print("CoM")
+        # print(com_x)
+        # print(com_y)
+
         # Embeddings
         # print("Dynamic Frictionsssss: should be (32,1)")
         dynamic_frictions_np = dynamic_frictions.cpu().detach().numpy().reshape(self.num_envs, -1)
@@ -576,8 +628,18 @@ class SlidingPandaGymEnv(DirectRLEnv):
         normalized_past_pusher_vel_obs_x = normalized_past_pusher_vel_obs[:,:,0].T + self.obs_vel_noise_step + self.obs_vel_noise_epi 
         normalized_past_pusher_vel_obs_y = normalized_past_pusher_vel_obs[:,:,1].T + self.obs_vel_noise_step + self.obs_vel_noise_epi 
         # normalized_goal_tensor_x = normalized_goal_tensor.view(-1, 1)
+
+        # Offline prop estimation
         
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x), dim=1)
+        rnn_prop_input = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y), dim=1)
+        # print("RNN prop input shape")
+        # print(rnn_prop_input.shape)
+
+        # normalised_rnn_prop_input = self.state_range_min + ((rnn_prop_input - self.state_min) * (self.state_range_max - self.state_range_min)) / (self.state_max - self.state_min)
+
+        # props = self.rnn_prop_model(normalised_rnn_prop_input)
+        
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
@@ -716,20 +778,20 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print("Euclid distance")
         # print(euclid_distance)
 
-        # Reset goal
-        curr_success_rate = self.extras.get('log')
-        if curr_success_rate is not None: 
-            # print(curr_success_rate["success_rate"])  
-            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
-                self.goal_threshold -= 0.05
-                print(self.goal_threshold)
-                # self.rew_scale_goal += 5
-                # self.success_threshold += 0.1
-                # self.goal_length -= 0.1 
-                self.curriculum_count = 0
-                pass
-            else:
-                self.curriculum_count+=1
+        # # Reset goal
+        # curr_success_rate = self.extras.get('log')
+        # if curr_success_rate is not None: 
+        #     # print(curr_success_rate["success_rate"])  
+        #     if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
+        #         self.goal_threshold -= 0.05
+        #         print(self.goal_threshold)
+        #         # self.rew_scale_goal += 5
+        #         # self.success_threshold += 0.1
+        #         # self.goal_length -= 0.1 
+        #         self.curriculum_count = 0
+        #         pass
+        #     else:
+        #         self.curriculum_count+=1
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
