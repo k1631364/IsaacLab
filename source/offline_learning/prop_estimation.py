@@ -176,7 +176,7 @@ def main():
     # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x), dim=1)
 
     # ### Stack data from all envs ###
-    selected_envs_num = 1000
+    selected_envs_num = 10
 
     memory_all_states = memory_all["states"][:,:selected_envs_num,[0,1,4,5]]
     states_transposed_data = memory_all_states.transpose(0, 1)
@@ -301,22 +301,41 @@ def main():
     print(chunked_data.shape)
     print(chunked_label.shape)
 
-    time.sleep(300)
+    # time.sleep(300)
 
     ### Remove data containing episode termination ###
-    first_one_idx = (chunked_data[:,:,-1] == 1).int().argmax(dim=1)
-    print(first_one_idx)
+    # last_column = chunked_data[:, :, -1]
+    # mask = (last_column != 1).all(dim=1)
+    # filtered_data = chunked_data[mask]
+    # filtered_label = chunked_label[mask]
 
+    # print("Filtered")
+    # print(filtered_data.shape)
+    # print(filtered_label.shape)
 
+    ### Cut and pad the sequence with termination ### 
+    # first_one_idx = (chunked_data[:,:,-1] == 1).int().argmax(dim=1)
+    terminated_mask = (chunked_data[:, :, -1] == 1).int()
+    last_one_indices = terminated_mask.cumsum(dim=1).argmax(dim=1)
+    last_one_indices = torch.clamp(last_one_indices + 1, max=chunked_data.size(1))
 
-    last_column = chunked_data[:, :, -1]
-    mask = (last_column != 1).all(dim=1)
-    filtered_data = chunked_data[mask]
-    filtered_label = chunked_label[mask]
+    cutoff_mask = torch.arange(chunked_data.size(1)).expand(chunked_data.size(0), -1).to(torch_device) >= last_one_indices.unsqueeze(1)
+    chunked_data[~cutoff_mask.unsqueeze(-1).expand_as(chunked_data)] = 0
 
-    print("Filtered")
-    print(filtered_data.shape)
-    print(filtered_label.shape)
+    # Filter out sequences that are all zeros
+    non_zero_sequences = torch.any(chunked_data != 0, dim=(1, 2))
+    padded_data = chunked_data[non_zero_sequences]
+
+    terminated_mask = (chunked_label[:, :, -1] == 1).int()
+    last_one_indices = terminated_mask.cumsum(dim=1).argmax(dim=1)
+    last_one_indices = torch.clamp(last_one_indices + 1, max=chunked_label.size(1))
+
+    cutoff_mask = torch.arange(chunked_label.size(1)).expand(chunked_label.size(0), -1).to(torch_device) >= last_one_indices.unsqueeze(1)
+    chunked_label[~cutoff_mask.unsqueeze(-1).expand_as(chunked_label)] = 0
+
+    # Filter out sequences that are all zeros
+    non_zero_sequences = torch.any(chunked_label != 0, dim=(1, 2))
+    padded_label = chunked_label[non_zero_sequences]
 
     # xpoints = np.arange(0, 10)
     # plt.plot(xpoints, chunked_data[1278,:,0].cpu().detach().numpy(), label="before reshape dynamic friction")
@@ -326,8 +345,10 @@ def main():
     print(log_fig_path)
 
     ### Remove termination data ###
-    filtered_data = filtered_data[:, :, :-1]
-    filtered_label = filtered_label[:, :, :-1]
+    filtered_data = padded_data[:, :, :-1]
+    filtered_label = padded_label[:, :, :-1]
+    # filtered_data = filtered_data[:, :, :-1]
+    # filtered_label = filtered_label[:, :, :-1]
 
     full_dataset = PolicyOfflineDataset(filtered_data, filtered_label)
 

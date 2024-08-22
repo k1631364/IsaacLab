@@ -134,7 +134,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     # cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
     #     prim_path="/World/envs/env_.*/cuboidpusher2",
     #     spawn=sim_utils.CuboidCfg(
-    #         size = [pusher_length, 0.2, 0.05], 
+    #         size = [pusher_length, pusher_length, pusher_length], # [pusher_length, 0.2, 0.05], 
     #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
     #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
     #         collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -328,6 +328,19 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_vel = [initial_vel_tensor]
 
+        # Past state tracking for RNN prop estimation
+        self.past_timestep_prop = 20
+        self.initial_pos_tensor_prop = torch.zeros(1, self.num_envs, len(self.state_pos_idx), device=self.scene.env_origins.device)
+        self.past_pusher_pos_prop = [self.initial_pos_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
+        self.past_puck_pos_prop = [self.initial_pos_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
+
+        # print(len(self.past_pusher_pos_prop))   
+
+        # print(torch.cat(self.past_puck_pos_prop, dim=0).shape)  
+        # print(torch.cat(self.past_pusher_pos_prop, dim=0).shape)  
+        # import time 
+        # time.sleep(300)
+        
         self.curriculum_count = 0
 
         # Embeddings
@@ -351,7 +364,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(self.embedding_lookuptable.shape) 
 
         # Prop estimation
-        prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-08-20_13-18-59/model/model_params_dict.pkl"
+        # prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-08-20_13-18-59/model/model_params_dict.pkl"
+        prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-08-21_23-21-03/model/model_params_dict.pkl"
         with open(prop_estimator_dict_path, "rb") as fp: 
             self.prop_estimator_dict = pickle.load(fp)
         print(self.prop_estimator_dict)
@@ -371,6 +385,11 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.state_max = self.prop_estimator_dict["state_max"]
         self.state_range_min = self.prop_estimator_dict["state_range_min"]
         self.state_range_max = self.prop_estimator_dict["state_range_max"]
+
+        self.dynamic_fric_min = self.prop_estimator_dict["dynamic_fric_min"]
+        self.dynamic_fric_max = self.prop_estimator_dict["dynamic_fric_max"]
+        self.target_range_min = self.prop_estimator_dict["target_range_min"]
+        self.target_range_max = self.prop_estimator_dict["target_range_max"]
 
         self.obs_pos_noise_epi = torch.normal(self.cfg.obs_pos_noise_mean, self.cfg.obs_pos_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
         self.obs_vel_noise_epi = torch.normal(self.cfg.obs_vel_noise_mean, self.cfg.obs_vel_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
@@ -501,6 +520,12 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # normalized_past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
         # print(normalized_past_pusher_pos_obs.shape)
 
+        # prop rnn (pusher)
+        self.past_pusher_pos_prop.append(normalized_curr_pusher_pos.unsqueeze(0))
+        self.past_pusher_pos_prop = self.past_pusher_pos_prop[-self.past_timestep_prop:]
+        past_pusher_pos_prop_tensor = torch.cat(self.past_pusher_pos_prop, dim=0)
+        normalized_past_pusher_pos_prop_obs  = past_pusher_pos_prop_tensor[-self.past_timestep_prop:, :, :]
+
         # self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
         # past_pusher_vel_obs = self.past_pusher_vel[:, -self.past_timestep:]
         # normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
@@ -529,6 +554,27 @@ class SlidingPandaGymEnv(DirectRLEnv):
         past_puck_pos_tensor = torch.cat(self.past_puck_pos, dim=0)
         # normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
         normalized_past_puck_pos_obs  = past_puck_pos_tensor
+
+        # prop rnn seq data (puck)
+        # print("Pos data")
+        # print(normalized_curr_puck_pos.unsqueeze(0).shape)
+        self.past_puck_pos_prop.append(normalized_curr_puck_pos.unsqueeze(0))
+        self.past_puck_pos_prop = self.past_puck_pos_prop[-self.past_timestep_prop:]
+        past_puck_pos_prop_tensor = torch.cat(self.past_puck_pos_prop, dim=0)
+        normalized_past_puck_pos_prop_obs  = past_puck_pos_prop_tensor
+        # print("past data len")
+        # print(len(self.past_puck_pos_prop))
+
+        # print(torch.cat(self.past_puck_pos_prop, dim=0).shape)  
+        # print(torch.cat(self.past_pusher_pos_prop, dim=0).shape) 
+        # print(len(self.past_puck_pos_prop)) 
+        # print("prop input")
+        # print(torch.cat(self.past_puck_pos_prop, dim=0))  
+        # print(torch.cat(self.past_pusher_pos_prop, dim=0)) 
+        # print(normalized_past_puck_pos_prop_obs.shape)
+        # print(normalized_past_pusher_pos_prop_obs.shape)
+        # import time 
+        # time.sleep(300)
         
         # self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cylinderpuck2_state[:, 7].reshape((-1,1))), dim=1)
         # past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
@@ -630,15 +676,17 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # normalized_goal_tensor_x = normalized_goal_tensor.view(-1, 1)
 
         # Offline prop estimation
-        
-        rnn_prop_input = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y), dim=1)
-        # print("RNN prop input shape")
-        # print(rnn_prop_input.shape)
 
-        # normalised_rnn_prop_input = self.state_range_min + ((rnn_prop_input - self.state_min) * (self.state_range_max - self.state_range_min)) / (self.state_max - self.state_min)
+        rnn_prop_input = torch.cat((normalized_past_puck_pos_prop_obs, normalized_past_pusher_pos_prop_obs), dim=2)        
 
-        # props = self.rnn_prop_model(normalised_rnn_prop_input)
+        normalised_rnn_prop_input = self.state_range_min + ((rnn_prop_input - self.state_min) * (self.state_range_max - self.state_range_min)) / (self.state_max - self.state_min)
+        normalised_rnn_prop_input_swapped = normalised_rnn_prop_input.permute(1, 0, 2)
         
+        props = self.rnn_prop_model(normalised_rnn_prop_input_swapped)
+
+        denormalised_target_dynamic_fric_data = ((props[:,0] - self.target_range_min) / (self.target_range_max - self.target_range_min)) * (self.dynamic_fric_max - self.dynamic_fric_min) + self.dynamic_fric_min
+        # print(denormalised_target_dynamic_fric_data)
+
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
@@ -868,6 +916,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.obs_vel_noise_epi_new = torch.normal(self.cfg.obs_vel_noise_mean, self.cfg.obs_vel_noise_std, size=(len(env_ids),1)).to(self.scene.env_origins.device)
         self.obs_pos_noise_epi[env_ids, :] = self.obs_pos_noise_epi_new
         self.obs_vel_noise_epi[env_ids, :] = self.obs_vel_noise_epi_new
+
+        # Past obs (prop) 
 
         # Reset goal
         # curr_success_rate = self.extras.get('log')
