@@ -38,7 +38,8 @@ def randomize_rigid_body_material(
     dynamic_friction_range: tuple[float, float],
     restitution_range: tuple[float, float],
     num_buckets: int,
-    asset_cfg: SceneEntityCfg,
+    asset_cfg: SceneEntityCfg, 
+    com_rad: float = None, 
     com_range_x: tuple[float, float] = None,
     com_range_y: tuple[float, float] = None,
     com_range_z: tuple[float, float] = None,
@@ -107,6 +108,14 @@ def randomize_rigid_body_material(
         com_samples[..., 1].uniform_(*com_range_y)
         com_samples[..., 2].uniform_(*com_range_z)
 
+    if com_rad!=None: 
+        import math
+        com_samples = torch.zeros(coms[env_ids].shape)
+        angles = torch.rand(coms[env_ids].shape[0]) * 2 * math.pi
+        radii = torch.sqrt(torch.rand(coms[env_ids].shape[0])) * (com_rad*0.7)
+        x = radii * torch.cos(angles)
+        y = radii * torch.sin(angles)
+
     if mass_range!=None: 
         mass_samples = torch.zeros(masses[env_ids].shape)
         mass_samples[..., 0].uniform_(*mass_range)
@@ -152,6 +161,11 @@ def randomize_rigid_body_material(
         # print("Com samplessss")
         # print(com_samples)
 
+    if com_rad!=None:
+        com_samples[..., 0] = x
+        com_samples[..., 1] = y
+        com_samples[..., 6] = 1.0
+
     if mass_range!=None:
         for d in range(1):
             buckets_mass = torch.tensor([(hi_mass[d] - lo_mass[d]) * i / num_buckets + lo_mass[d] for i in range(num_buckets)], device="cpu")
@@ -186,12 +200,16 @@ def randomize_rigid_body_material(
         materials[env_ids] = material_samples
         if com_range_x!=None:
             coms[env_ids] = com_samples
+        if com_rad!=None: 
+            coms[env_ids] = com_samples
         if mass_range!=None: 
             masses[env_ids] = mass_samples
 
     # apply to simulation
     asset.root_physx_view.set_material_properties(materials, env_ids)
     if com_range_x!=None:
+        asset.root_physx_view.set_coms(coms, env_ids)
+    if com_rad!=None:
         asset.root_physx_view.set_coms(coms, env_ids)
     if mass_range!=None:
         asset.root_physx_view.set_masses(masses, env_ids)

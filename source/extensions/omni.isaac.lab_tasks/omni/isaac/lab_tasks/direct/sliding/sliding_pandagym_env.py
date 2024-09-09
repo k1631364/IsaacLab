@@ -43,32 +43,65 @@ class EventCfg:
       mode="reset",
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
-          "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.3),
-          "restitution_range": (0.4, 0.4),  # (1.0, 1.0),  
-          "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
-          "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
-          "com_range_z": (0.0, 0.0), 
-          "mass_range": (0.15, 0.15),
+          "static_friction_range": (0.01, 0.01),
+          "dynamic_friction_range": (0.01, 0.2),
+          "restitution_range": (0.6, 0.6),  # (1.0, 1.0),  
+          "com_rad": 0.032, 
+        #   "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
+        #   "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
+        #   "com_range_z": (0.0, 0.0), 
+          "mass_range": (0.05, 0.05),
           "num_buckets": 250,
       },
   )
 
-  robot_physics_material2 = EventTerm(
-      func=mdp.randomize_rigid_body_material,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("cuboidpusher2"),
-          "static_friction_range": (0.5, 0.5),
-          "dynamic_friction_range": (0.5, 0.5),
-          "restitution_range": (0.4, 0.6),
-        #   "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
-        #   "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
-        #   "com_range_z": (0.0, 0.0), 
-          "mass_range": (0.5, 3.0),
-          "num_buckets": 250,
-      },
-  )
+  @configclass
+  class EventCfg:
+    robot_physics_material_table = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cuboidtable2"),
+            "static_friction_range": (0.01, 0.01),
+            "dynamic_friction_range": (0.01, 0.01),
+            "restitution_range": (0.6, 0.6),  # (1.0, 1.0),  
+            "mass_range": (30.0, 30.0),
+            "num_buckets": 250,
+        },
+    )
+
+# class EventCfg:
+#   robot_physics_material = EventTerm(
+#       func=mdp.randomize_rigid_body_material,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
+#           "static_friction_range": (0.05, 0.05),
+#           "dynamic_friction_range": (0.05, 0.3),
+#           "restitution_range": (0.4, 0.4),  # (1.0, 1.0),  
+#           "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
+#           "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
+#           "com_range_z": (0.0, 0.0), 
+#           "mass_range": (0.15, 0.15),
+#           "num_buckets": 250,
+#       },
+#   )
+
+#   robot_physics_material2 = EventTerm(
+#       func=mdp.randomize_rigid_body_material,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("cuboidpusher2"),
+#           "static_friction_range": (0.5, 0.5),
+#           "dynamic_friction_range": (0.5, 0.5),
+#           "restitution_range": (0.4, 0.6),
+#         #   "com_range_x": (-0.00, 0.00), # (-0.02, 0.02),
+#         #   "com_range_y": (-0.00, 0.00), # (-0.02, 0.02),
+#         #   "com_range_z": (0.0, 0.0), 
+#           "mass_range": (0.5, 3.0),
+#           "num_buckets": 250,
+#       },
+#   )
   
   # Default material proeprties tensor([[[0.5000, 0.5000, 0.0000]]])
   # Juan's pushing randomisation: distribution_parameters: [[0.5, 0.2, 0.4], [0.7, 0.4, 0.6]]
@@ -179,22 +212,33 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     # Goal
     goal_location = 0.5  # the cart is reset if it exceeds that position [m]
     goal_location = [0.5, 0.0, 1.0]
-    goal_length = 0.5
+    goal_length = 0.1
     max_puck_goalcount = 10
 
+    # markergoal1_cfg = VisualizationMarkersCfg(
+    #     prim_path="/Visual/Goal1",
+    #     markers={
+    #         "cylinder": sim_utils.CylinderCfg(
+    #             radius = 0.05, 
+    #             height = 0.05, 
+    #             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
+    #         ),
+    #     },
+    # )
+
     markergoal1_cfg = VisualizationMarkersCfg(
-        prim_path="/Visual/Goal1",
+        prim_path="/Visual/Start1",
         markers={
-            "cylinder": sim_utils.CylinderCfg(
-                radius = 0.05, 
-                height = 0.05, 
+            "cube": sim_utils.CuboidCfg(
+                size=(goal_length*2, goal_length*2, 0.01),
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
             ),
         },
     )
 
+
     # Start region
-    max_pusher_posx_bound = 1.25  # the cart is reset if it exceeds that position [m]
+    max_pusher_posx_bound = 1.6  # the cart is reset if it exceeds that position [m]
     min_pusher_posx_bound = 1.0  # the cart is reset if it exceeds that position [m]
     max_pusher_posx = max_pusher_posx_bound-(pusher_length/2.0)  # the cart is reset if it exceeds that position [m] (0.95)
     min_pusher_posx = min_pusher_posx_bound+(pusher_length/2.0)   # the cart is reset if it exceeds that position [m] (0.05)
@@ -223,7 +267,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 13
+    num_observations = 10
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -276,19 +320,19 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.success_threshold = 0.2
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        self.goal_threshold = 0.2
+        self.goal_threshold = 0.1
         
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = -0.0
-        self.goal_location_max_x = 0.75
-        self.goal_location_min_y = -0.2
-        self.goal_location_max_y = 0.2
+        self.goal_location_min_x = 0.7
+        self.goal_location_max_x = 0.9
+        self.goal_location_min_y = -0.1
+        self.goal_location_max_y = 0.1
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
-        self.discrete_goals_x = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
-        self.discrete_goals_y = torch.tensor([0.3, 0.0, -0.3], device=self.device)
-        self.discrete_goal = False
+        self.discrete_goals_x = torch.tensor([0.7, 0.9], device=self.device)
+        self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)
+        self.discrete_goal = True
         
         # Normalisaion range: goal
         # self.goal_location_normmax = 2.0
@@ -446,7 +490,9 @@ class SlidingPandaGymEnv(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
-        self.actions[self.actions < -2.0] = -2.0
+        self.actions[self.actions < -1.0] = -1.0
+        # self.actions[self.actions < 0.0] = -0.0
+        # self.actions[self.actions > 0.0] = -0.0
         # print(self.actions.shape)
         # print("Action vel")
         # print(self.actions)
@@ -540,6 +586,8 @@ class SlidingPandaGymEnv(DirectRLEnv):
         
         # Puck state
         curr_cylinderpuck2_state = self.cylinderpuck2_state.clone()
+        # print("puck state")
+        # print(curr_cylinderpuck2_state[:, 6])
         curr_cylinderpuck2_state[:, 0:3] = (
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )
@@ -687,8 +735,12 @@ class SlidingPandaGymEnv(DirectRLEnv):
         denormalised_target_dynamic_fric_data = ((props[:,0] - self.target_range_min) / (self.target_range_max - self.target_range_min)) * (self.dynamic_fric_max - self.dynamic_fric_min) + self.dynamic_fric_min
         # print(denormalised_target_dynamic_fric_data)
 
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
+        # print("state shape")
+        # print(curr_cylinderpuck2_state[:, 6].view(-1,1).shape)
+        # print(normalized_past_puck_pos_obs_x.shape)
+
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
@@ -962,7 +1014,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
             cylinderpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
         )
         cylinderpuck2_default_state[:, 7:] = torch.zeros_like(self.cylinderpuck2.data.default_root_state[env_ids, 7:])
-        # cylinderpuck2_default_state[:, 7] = -2.5
+        # cylinderpuck2_default_state[:, 7] = -1.0
         self.cylinderpuck2_state[env_ids] = cylinderpuck2_default_state.clone()
         self.cylinderpuck2.write_root_state_to_sim(cylinderpuck2_default_state, env_ids)
 
