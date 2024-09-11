@@ -123,6 +123,12 @@ class LSTMPropertyEstimator(nn.Module):
 
 #         return out
 
+def normalize(tensor, min_val, max_val, new_min, new_max):
+    return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
+
+def denormalize(tensor, min_val, max_val, new_min, new_max):
+    return (tensor - new_min) / (new_max - new_min) * (max_val - min_val) + min_val
+
 def main():
 
     ### Weights and biases for recording ###
@@ -134,7 +140,7 @@ def main():
     
     # H5 file path (to read)
     log_root_path = os.path.join("logs", "prop_estimation", "offline_prop_estimation")
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  
     log_dir = os.path.join(log_root_path, log_dir)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -155,328 +161,416 @@ def main():
     if not os.path.exists(log_model_dir):
         os.makedirs(log_model_dir)
 
+    all_data_list = []
+    all_labels_list = []
     # Read memories
-    memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-08-29_15-13-53"    
-    for memory_dir in os.listdir(checkpoint_dir):
+    memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-09-10_13-09-18_test2"    
+    for memory_dir in os.listdir(memories_path):
+        print(memory_dir)
 
-
-    # # Read memories
-    # # memory_path = "/workspace/isaaclab/logs/skrl/sliding_direct/2024-08-16_21-51-14/memory_all/memories/24-08-16_21-52-19-857841_memory_0x7f440ff1c130.pt"
-    # memory_path = "/workspace/isaaclab/logs/skrl/sliding_direct/2024-08-18_17-35-42/memory_all/memories/24-08-18_18-24-00-446689_memory_0x7f87d00f41f0.pt"
-    # memory_all = torch.load(memory_path)
-    # # print(memory_all)
-    # print(type(memory_all))  # Should show <class 'dict'>
-    # tensor_names = list(memory_all.keys())
-    # print("Tensor names:", tensor_names) 
-
-    # # tensor_values = [memory_all[name] for name in tensor_names]
-    # # print(tensor_values)
-    # print(memory_all["states"].shape) 
-    # print(memory_all["actions"].shape)
-    # print(memory_all["terminated"].shape)
-    # print(memory_all["log_prob"].shape)
-    # print(memory_all["rewards"].shape)
-    # print(memory_all["props"].shape)
-
-    # # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x), dim=1)
-
-    # # ### Stack data from all envs ###
-    # selected_envs_num = 10
-
-    # memory_all_states = memory_all["states"][:,:selected_envs_num,[0,1,4,5]]
-    # states_transposed_data = memory_all_states.transpose(0, 1)
-    # # states_transposed_data = memory_all["states"].transpose(0, 1)
-    # states_reshaped_data = states_transposed_data.reshape(-1, memory_all_states.shape[2])
-
-    # print(states_reshaped_data.shape)
-    
-    # # State normalisation
-    # state_min = torch.min(states_reshaped_data)
-    # state_max = torch.max(states_reshaped_data)
-    # state_range_min = -0.9
-    # state_range_max = 0.9
-    
-    # normalised_states_reshaped_data = state_range_min + ((states_reshaped_data - state_min) * (state_range_max - state_range_min)) / (state_max - state_min)
-
-    # # xpoints = np.arange(0, 10)
-    # # plt.plot(xpoints, states_reshaped_data[0:10,0].cpu().detach().numpy(), label="before reshape dynamic friction")
-    # # log_fig_path = os.path.join(log_fig_dir, 'test_states.png')
-    # # plt.savefig(log_fig_path)
-
-    # memory_all_actions = memory_all["actions"][:,:selected_envs_num,:]
-    # actions_transposed_data = memory_all_actions.transpose(0, 1)
-    # # actions_transposed_data = memory_all["actions"].transpose(0, 1)
-    # actions_reshaped_data = actions_transposed_data.reshape(-1, memory_all["actions"].shape[2])
-
-    # print(actions_reshaped_data.shape)
-
-    # # xpoints = np.arange(0, 10)
-    # # plt.plot(xpoints, actions_reshaped_data[0:10,0].cpu().detach().numpy(), label="before reshape dynamic friction")
-    # # log_fig_path = os.path.join(log_fig_dir, 'test_actions.png')
-    # # plt.savefig(log_fig_path)
-
-    # memory_all_terminated = memory_all["terminated"][:,:selected_envs_num,:]
-    # terminated_transposed_data = memory_all_terminated.transpose(0, 1)
-    # # terminated_transposed_data = memory_all["terminated"].transpose(0, 1)
-    # terminated_reshaped_data = terminated_transposed_data.reshape(-1, memory_all["terminated"].shape[2])
-
-    # print(terminated_reshaped_data.shape)
-
-    # # xpoints = np.arange(0, 10)
-    # # plt.plot(xpoints, terminated_reshaped_data[0:10,0].cpu().detach().numpy(), label="before reshape dynamic friction")
-    # # log_fig_path = os.path.join(log_fig_dir, 'test_terminated.png')
-    # # plt.savefig(log_fig_path)
-
-    # memory_all_props = memory_all["props"][:,:selected_envs_num,:]
-    # props_transposed_data = memory_all_props.transpose(0, 1)
-    # # props_transposed_data = memory_all["props"].transpose(0, 1)
-    # props_reshaped_data = props_transposed_data.reshape(-1, memory_all["props"].shape[2])
-
-    # print(props_reshaped_data.shape)
-
-    # # Props normalisation
-    # dynamic_fric_data = props_reshaped_data[:,0]
-    # dynamic_fric_min = torch.min(dynamic_fric_data)
-    # dynamic_fric_max = torch.max(dynamic_fric_data)
-    # target_range_min = 0.1
-    # target_range_max = 0.9
-    
-    # normalised_dynamic_fric_data = target_range_min + ((dynamic_fric_data - dynamic_fric_min) * (target_range_max - target_range_min)) / (dynamic_fric_max - dynamic_fric_min)
-
-    # comx_data = props_reshaped_data[:,1]
-    # comx_min = torch.min(comx_data)
-    # comx_max = torch.max(comx_data)
-    # target_range_min = 0.1
-    # target_range_max = 0.9
-    
-    # normalised_comx_data = target_range_min + ((comx_data - comx_min) * (target_range_max - target_range_min)) / (comx_max - comx_min)
-
-    # comy_data = props_reshaped_data[:,1]
-    # comy_min = torch.min(comy_data)
-    # comy_max = torch.max(comy_data)
-    # target_range_min = 0.1
-    # target_range_max = 0.9
-    
-    # normalised_comy_data = target_range_min + ((comy_data - comy_min) * (target_range_max - target_range_min)) / (comy_max - comy_min)
-
-    # normalised_props_reshaped_data = torch.hstack((normalised_dynamic_fric_data.unsqueeze(1), normalised_comx_data.unsqueeze(1), normalised_comy_data.unsqueeze(1)))
-    
-    # xpoints = np.arange(0, 10)
-    # plt.plot(xpoints, props_reshaped_data[0:10,0].cpu().detach().numpy(), label="before reshape dynamic friction")
-    # log_fig_path = os.path.join(log_fig_dir, 'test_props.png')
-    # plt.savefig(log_fig_path)
-
-    # print(states_reshaped_data.shape)
-    # print(actions_reshaped_data.shape)
-    # print(terminated_reshaped_data.shape)
-    # print(props_reshaped_data.shape)
-
-    # ### Remove data with NaN ###
-    # # print(actions_reshaped_data)
-    # nan_mask = torch.isnan(states_reshaped_data[:, 0])
-    # print(states_reshaped_data.shape)
-    # print(terminated_reshaped_data.shape)
-    # data = torch.cat((normalised_states_reshaped_data, terminated_reshaped_data), dim=1) 
-    # print(data.shape)
-    # data = data[~nan_mask, :]
-    # label = torch.cat((normalised_props_reshaped_data, terminated_reshaped_data), dim=1)
-    # label = label[~nan_mask, :]
-
-    # ### Chunk into shorter senquences ###
-    # # Set sequence length
-    # sequence_length = 20
-
-    # # Ensure the total number of data points is divisible by sequence_length
-    # remainder = data.size(0) % sequence_length
-    # if remainder != 0:
-    #     data = data[:-remainder]  # Trim the excess data points
-
-    # num_sequences = data.size(0) // sequence_length
-    # chunked_data = data.view(num_sequences, sequence_length, -1)
-
-    # # Ensure the total number of label points is divisible by sequence_length
-    # remainder = label.size(0) % sequence_length
-    # if remainder != 0:
-    #     label = label[:-remainder]  # Trim the excess label points
-
-    # num_sequences = label.size(0) // sequence_length
-    # chunked_label = label.view(num_sequences, sequence_length, -1)
-
-    # print("Chunked data")
-    # print(chunked_data.shape)
-    # print(chunked_label.shape)
-
-    # # time.sleep(300)
-
-    # ### Remove data containing episode termination ###
-    # # last_column = chunked_data[:, :, -1]
-    # # mask = (last_column != 1).all(dim=1)
-    # # filtered_data = chunked_data[mask]
-    # # filtered_label = chunked_label[mask]
-
-    # # print("Filtered")
-    # # print(filtered_data.shape)
-    # # print(filtered_label.shape)
-
-    # ### Cut and pad the sequence with termination ### 
-    # # first_one_idx = (chunked_data[:,:,-1] == 1).int().argmax(dim=1)
-    # terminated_mask = (chunked_data[:, :, -1] == 1).int()
-    # last_one_indices = terminated_mask.cumsum(dim=1).argmax(dim=1)
-    # last_one_indices = torch.clamp(last_one_indices + 1, max=chunked_data.size(1))
-
-    # cutoff_mask = torch.arange(chunked_data.size(1)).expand(chunked_data.size(0), -1).to(torch_device) >= last_one_indices.unsqueeze(1)
-    # chunked_data[~cutoff_mask.unsqueeze(-1).expand_as(chunked_data)] = 0
-
-    # # Filter out sequences that are all zeros
-    # non_zero_sequences = torch.any(chunked_data != 0, dim=(1, 2))
-    # padded_data = chunked_data[non_zero_sequences]
-
-    # terminated_mask = (chunked_label[:, :, -1] == 1).int()
-    # last_one_indices = terminated_mask.cumsum(dim=1).argmax(dim=1)
-    # last_one_indices = torch.clamp(last_one_indices + 1, max=chunked_label.size(1))
-
-    # cutoff_mask = torch.arange(chunked_label.size(1)).expand(chunked_label.size(0), -1).to(torch_device) >= last_one_indices.unsqueeze(1)
-    # chunked_label[~cutoff_mask.unsqueeze(-1).expand_as(chunked_label)] = 0
-
-    # # Filter out sequences that are all zeros
-    # non_zero_sequences = torch.any(chunked_label != 0, dim=(1, 2))
-    # padded_label = chunked_label[non_zero_sequences]
-
-    # # xpoints = np.arange(0, 10)
-    # # plt.plot(xpoints, chunked_data[1278,:,0].cpu().detach().numpy(), label="before reshape dynamic friction")
-    # # log_fig_path = os.path.join(log_fig_dir, 'test_chunked.png')
-    # # plt.savefig(log_fig_path)
-
-    # print(log_fig_path)
-
-    # ### Remove termination data ###
-    # filtered_data = padded_data[:, :, :-1]
-    # filtered_label = padded_label[:, :, :-1]
-    # # filtered_data = filtered_data[:, :, :-1]
-    # # filtered_label = filtered_label[:, :, :-1]
-
-    # full_dataset = PolicyOfflineDataset(filtered_data, filtered_label)
-
-    # train_size = int(0.8 * len(full_dataset))  # 80% of the data for training
-    # test_size = len(full_dataset) - train_size  # Remaining 20% for testing
-
-    # # Split dataset into training and test sets
-    # train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
-
-    # batch_size = 64
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-    # # Example DataLoader for test set
-    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    # # Example dimensions
-    # input_size = 4  # State and action concatenated size
-    # hidden_size = 64    # Number of features in hidden state
-    # num_layers = 1      # Number of LSTM layers
-    # output_size = 1     # Number of physical properties (e.g., friction, CoM)
-    # num_epochs = 500
-    # learning_rate = 0.001
-
-    # model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
-    # criterion = nn.MSELoss()
-    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    # model.train()
-    
-    # for epoch in range(num_epochs):
-    #     for inputs, targets in train_loader:
-    #         # Concatenate state and action vectors
-    #         inputs = inputs.to(torch_device)
-    #         targets = targets.to(torch_device)
-    #         # targets = targets[:, -1, :]
-    #         targets = targets[:, -1, 0].view(-1,1)
-
-    #         # Forward pass
-    #         outputs = model(inputs)
-    #         loss = criterion(outputs, targets)
-            
-    #         # Backward pass and optimization
-    #         optimizer.zero_grad()
-    #         loss.backward()
-    #         optimizer.step()
+        memory_path = os.path.join(memories_path, memory_dir, "memories")
+        # print(memory_path)
         
-    #     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        files = [f for f in os.listdir(memory_path) if os.path.isfile(os.path.join(memory_path, f))]
+        # print(files)
 
-    #     # Record average loss after each epoch to weights and biases
-    #     wandb.log({"loss": loss.item()})
+        memory_filename = os.path.join(memory_path, files[0])
+        print(memory_filename)
 
-    # # Save the learnt model to the file
-    # model_path = log_model_dir + "/LSTM_best.pth"
-    # torch.save(model.to(torch_device).state_dict(), model_path)
+        memory_all = torch.load(memory_filename)
+        # print(type(memory_all))  # Should show <class 'dict'>
+        tensor_names = list(memory_all.keys())
+        # print("Tensor names:", tensor_names) 
+        # print(memory_all["props"][:100,:,:]) 
 
-    # model_params_dict = {
-    #     "input_size": input_size, 
-    #     "hidden_size": hidden_size, 
-    #     "num_layers": num_layers, 
-    #     "output_size": output_size, 
-    #     "num_epochs": num_epochs, 
-    #     "learning_rate": learning_rate, 
-    #     "criterion": criterion, 
-    #     "optimizer": optimizer, 
-    #     "model_path": model_path, 
-    #     "state_min": state_min, 
-    #     "state_max": state_max, 
-    #     "state_range_min": state_range_min, 
-    #     "state_range_max": state_range_max, 
-    #     "dynamic_fric_min": dynamic_fric_min, 
-    #     "dynamic_fric_max": dynamic_fric_max, 
-    #     "comx_min": comx_min, 
-    #     "comx_max": comx_max, 
-    #     "comy_min": comy_min, 
-    #     "comy_max": comy_max, 
-    #     "target_range_min": target_range_min, 
-    #     "target_range_max": target_range_max, 
-    # }
-    # model_params_path = log_model_dir + "/model_params_dict.pkl"
-    # with open(model_params_path, "wb") as fp: 
-    #     pickle.dump(model_params_dict, fp)
+        ### Stack data from all envs ###
+        selected_envs_num = 1
 
-    # # /workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/LSTM_best.pth
+        # memory_all_states = memory_all["states"][:,:selected_envs_num,0:9]
+        memory_all_states = memory_all["states"][:,:selected_envs_num,[0,1,2,5,6]]
+        states_transposed_data = memory_all_states.transpose(0, 1)
+        states_reshaped_data = states_transposed_data.reshape(-1, memory_all_states.shape[2])
 
-    # # Eval
+        print(states_reshaped_data.shape)
 
-    # # Load the learnt model
-    # model.load_state_dict(torch.load(model_path, map_location=torch.device(torch_device)))
+        memory_all_actions = memory_all["actions"][:,:selected_envs_num,:]
+        actions_transposed_data = memory_all_actions.transpose(0, 1)
+        actions_reshaped_data = actions_transposed_data.reshape(-1, memory_all_actions.shape[2])
 
-    # model.eval()
+        print(actions_reshaped_data.shape)
 
-    # targets_record_list = []
-    # outputs_record_list = []
-    # with torch.no_grad():
-    #     for batch_idx, (inputs, targets) in enumerate(test_loader):
-    #         inputs = inputs.to(torch_device)
-    #         targets = targets.to(torch_device)
-    #         # targets = targets[:, -1, :]
-    #         targets = targets[:, -1, 0].view(-1,1)
-    #         for i in range(len(inputs)):
-    #             input = inputs[i].unsqueeze(0)  # Add batch dimension
-    #             target = targets[i].unsqueeze(0)  # Add batch dimension
+        memory_all_terminated = memory_all["terminated"][:,:selected_envs_num,:]
+        terminated_transposed_data = memory_all_terminated.transpose(0, 1)
+        terminated_reshaped_data = terminated_transposed_data.reshape(-1, memory_all_terminated.shape[2])
 
-    #             # print(f"Sample index: {i}")
-    #             # print(f"Sample shape: {input.shape}")
-    #             # print(f"Label shape: {target.shape}")
+        print(terminated_reshaped_data.shape)
+        
+        memory_all_props = memory_all["props"][:,:selected_envs_num,:]
+        props_transposed_data = memory_all_props.transpose(0, 1)
+        props_reshaped_data = props_transposed_data.reshape(-1, memory_all_props.shape[2])
 
-    #             # Forward pass
-    #             # Input size torch.Size([1, 20, 4]) [batch_size, , seq_length, 4]
-    #             # Output size torch.Size([1, 1])    [batch_size, 1]
-    #             output = model(input)
-    #             loss = criterion(output, target)
+        print(props_reshaped_data.shape)
 
-    #             # print(f"Sample index: {i}")
-    #             # # print(f"Sample shape: {input}")
-    #             # print(f"Label shape: {target.shape}")
-    #             # print(f"Output shape: {output.shape}")
+        ### Remove data with NaN ###
+        nan_mask = torch.isnan(states_reshaped_data[:, 0])
+        # print(states_reshaped_data.shape)
+        # print(terminated_reshaped_data.shape)
+        # data = torch.cat((states_reshaped_data, terminated_reshaped_data), dim=1) 
+        data = torch.cat((states_reshaped_data, actions_reshaped_data, terminated_reshaped_data), dim=1) 
+        # print(data.shape)
+        data = data[~nan_mask, :]
+        label = torch.cat((props_reshaped_data, terminated_reshaped_data), dim=1)
+        label = label[~nan_mask, :]
+        print(data.shape)
+        print(label.shape)
+
+        ### Chunk into shorter senquences ###
+        # Set sequence length
+        sequence_length = 15
+
+        # Ensure the total number of data points is divisible by sequence_length
+        remainder = data.size(0) % sequence_length
+        if remainder != 0:
+            data = data[:-remainder]  # Trim the excess data points
+
+        num_sequences = data.size(0) // sequence_length
+        chunked_data = data.view(num_sequences, sequence_length, -1)
+
+        # Ensure the total number of label points is divisible by sequence_length
+        remainder = label.size(0) % sequence_length
+        if remainder != 0:
+            label = label[:-remainder]  # Trim the excess label points
+
+        num_sequences = label.size(0) // sequence_length
+        chunked_label = label.view(num_sequences, sequence_length, -1)
+
+        print("Chunked data")
+        print(chunked_data.shape)
+        print(chunked_label.shape)
+
+        ### Cut and pad the sequence with termination ### 
+        # Find sequences that contain a `1` in the last dimension
+        contains_one_mask = (chunked_data[:, :, -1] == 1).any(dim=1)
+        # Remove sequences that contain `1` in the last dimension
+        padded_data = chunked_data[~contains_one_mask]
+
+        # Find sequences that contain a `1` in the last dimension
+        contains_one_mask = (chunked_label[:, :, -1] == 1).any(dim=1)
+        # Remove sequences that contain `1` in the last dimension
+        padded_label = chunked_label[~contains_one_mask]
+
+        # # For data
+        # # Get the termination mask where `1` occurs in the third dimension
+        # terminated_mask = (chunked_data[:, :, -1] == 1).int()
+
+        # # Find the index of the first occurrence of `1` for each sequence
+        # first_one_index = terminated_mask.argmax(dim=1)
+
+        # # Calculate the length of the original sequence
+        # seq_len = chunked_data.size(1)
+
+        # # Create a tensor of index [0, 1, 2, ..., seq_len-1]
+        # seq_index = torch.arange(seq_len, device=chunked_data.device).unsqueeze(0).expand(chunked_data.size(0), -1)
+
+        # # Create a mask to keep only the values up to and including the first occurrence of `1`
+        # cutoff_mask = seq_index <= first_one_index.unsqueeze(1)
+
+        # # Prepare to cut off and pad
+        # padded_data = torch.zeros_like(chunked_data)
+
+        # # Copy the data up to the first occurrence of `1` into the padded_data tensor
+        # for i in range(chunked_data.size(0)):
+        #     length = cutoff_mask[i].sum().item()
+        #     padded_data[i, -length:] = chunked_data[i, :length]
+
+        # # For labels
+        # terminated_mask = (chunked_label[:, :, -1] == 1).int()
+
+        # # Find the index of the first occurrence of `1` for each sequence
+        # first_one_index = terminated_mask.argmax(dim=1)
+
+        # # Calculate the length of the original sequence
+        # seq_len = chunked_label.size(1)
+
+        # # Create a tensor of index [0, 1, 2, ..., seq_len-1]
+        # seq_index = torch.arange(seq_len, device=chunked_label.device).unsqueeze(0).expand(chunked_label.size(0), -1)
+
+        # # Create a mask to keep only the values up to and including the first occurrence of `1`
+        # cutoff_mask = seq_index <= first_one_index.unsqueeze(1)
+
+        # # Prepare to cut off and pad
+        # padded_label = torch.zeros_like(chunked_label)
+
+        # # Extract the first value of each sequence for padding
+        # first_values = chunked_label[:, 0, :]  # Assuming the first value to pad with is the first value in the sequence
+
+        # # Copy the label up to the first occurrence of `1` into the padded_label tensor with the first value = fric not 0
+        # for i in range(chunked_label.size(0)):
+        #     length = cutoff_mask[i].sum().item()
+        #     # Fill the padded_label with the first value for padding
+        #     padded_label[i, -length:] = chunked_label[i, :length]
+        #     # Pad the beginning with the first value of the sequence
+        #     if length < seq_len:
+        #         padded_label[i, :-length] = first_values[i]
+
+        ### Remove termination data ###
+        filtered_data = padded_data[:, :, :-1]
+        filtered_label = padded_label[:, :, :-1]
+
+        print(filtered_data.shape)
+        print(filtered_label.shape)
+
+        all_data_list.append(filtered_data)
+        all_labels_list.append(filtered_label)
+
+    all_data_tensor = torch.cat(all_data_list, dim=0)
+    all_labels_tensor = torch.cat(all_labels_list, dim=0)
+
+    print(all_data_tensor.shape)
+    print(all_labels_tensor.shape)
+
+    # Define index for position, rotation, and velocity features
+    # position_index = [0, 1, 5, 6]
+    # rotation_index = 2
+    # velocity_index = [3, 4, 7, 8, 9, 10]
+
+    position_index = [0, 1, 3, 4]
+    rotation_index = 2
+    # velocity_index = [3, 4, 7, 8, 9, 10]
+
+    # Extract features
+    positions = all_data_tensor[:, :, position_index]
+    rotation = all_data_tensor[:, :, rotation_index]
+    # velocities = all_data_tensor[:, :, velocity_index]
+
+    # Compute min and max for each feature category
+    pos_min = positions.min()
+    pos_max = positions.max()
+    rot_min = rotation.min()
+    rot_max = rotation.max()
+    # vel_min = velocities.min()
+    # vel_max = velocities.max()
+
+    feature_target_min = -0.9
+    feature_target_max = 0.9
+
+    # Normalize features
+    normalized_positions = normalize(positions, pos_min, pos_max, feature_target_min, feature_target_max)
+    normalized_rotation = normalize(rotation, rot_min, rot_max, feature_target_min, feature_target_max)
+    # normalized_velocities = normalize(velocities, vel_min, vel_max, feature_target_min, feature_target_max)
+
+    # Reconstruct the normalized data tensor
+    normalized_data = all_data_tensor.clone()
+    normalized_data[:, :, position_index] = normalized_positions
+    normalized_data[:, :, rotation_index] = normalized_rotation
+    # normalized_data[:, :, velocity_index] = normalized_velocities
+
+    print(normalized_data.shape)
+
+    # Define index for position, rotation, and velocity features
+    friction_index = 0
+    com_index = [1, 2]
+
+    # Extract features
+    frictions = all_labels_tensor[:, :, friction_index]
+    coms = all_labels_tensor[:, :, com_index]
+
+    # Compute min and max for each feature category
+    fric_min = frictions.min()
+    fric_max = frictions.max()
+    com_min = coms.min()
+    com_max = coms.max()
+
+    print(fric_min)
+    print(fric_max)
+    print(com_min)
+    print(com_max)
+
+    action_target_min = 0.1
+    action_target_max = 0.9
+
+    # Normalize features
+    normalized_friction = normalize(frictions, fric_min, fric_max, action_target_min, action_target_max)
+    normalized_com = normalize(coms, com_min, com_max, action_target_min, action_target_max)
+
+    # Reconstruct the normalized data tensor
+    normalized_labels = all_labels_tensor.clone()
+    normalized_labels[:, :, friction_index] = normalized_friction
+    normalized_labels[:, :, com_index] = normalized_com
+
+    print(normalized_labels.shape)
+
+    full_dataset = PolicyOfflineDataset(normalized_data, normalized_labels)
+
+    train_size = int(0.8 * len(full_dataset))  # 80% of the data for training
+    test_size = len(full_dataset) - train_size  # Remaining 20% for testing
+
+    # Split dataset into training and test sets
+    train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+
+    batch_size = 64 # 64
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # Example DataLoader for test set
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    # Example dimensions
+    input_size = 7 # 11  # State and action concatenated size
+    hidden_size = 64    # Number of features in hidden state
+    num_layers = 1      # Number of LSTM layers
+    output_size = 1     # Number of physical properties (e.g., friction, CoM)
+    num_epochs = 1000
+    learning_rate = 0.001
+
+    model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    model.train()
+    
+    for epoch in range(num_epochs):
+        for inputs, targets in train_loader:
+            # Concatenate state and action vectors
+            inputs = inputs.to(torch_device)
+            targets = targets.to(torch_device)
+            # targets = targets[:, -1, :]
+            targets = targets[:, -1, 0].view(-1,1)
+
+            # Forward pass
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            
+            # Backward pass and optimization
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+
+        # Record average loss after each epoch to weights and biases
+        wandb.log({"loss": loss.item()})
+
+    # Save the learnt model to the file
+    model_path = log_model_dir + "/LSTM_best.pth"
+    torch.save(model.to(torch_device).state_dict(), model_path)
+    print("Model path")
+    print(model_path)
+
+    model_params_dict = {
+        "input_size": input_size, 
+        "hidden_size": hidden_size, 
+        "num_layers": num_layers, 
+        "output_size": output_size, 
+        "num_epochs": num_epochs, 
+        "learning_rate": learning_rate, 
+        "criterion": criterion, 
+        "optimizer": optimizer, 
+        "model_path": model_path, 
+
+        "sequence_length": sequence_length, 
+
+        "position_index": position_index, 
+        "rotation_index": rotation_index, 
+        # "velocity_index": velocity_index, 
+        "pos_min": pos_min, 
+        "pos_max": pos_max, 
+        "rot_min": rot_min, 
+        "rot_max": rot_max, 
+        # "vel_min": vel_min, 
+        # "vel_max": vel_max, 
+        "feature_target_min": feature_target_min, 
+        "feature_target_max": feature_target_max,
+
+        "friction_index": friction_index, 
+        "com_index": com_index, 
+        "fric_min": fric_min, 
+        "fric_max": fric_max, 
+        "com_min": com_min, 
+        "com_max": com_max, 
+        "action_target_min": action_target_min, 
+        "action_target_max": action_target_max, 
+
+    }
+    model_params_path = log_model_dir + "/model_params_dict.pkl"
+    with open(model_params_path, "wb") as fp: 
+        pickle.dump(model_params_dict, fp)
+
+    # /workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/LSTM_best.pth
+
+    # Eval
+
+    # Load the learnt model
+    model.load_state_dict(torch.load(model_path, map_location=torch.device(torch_device)))
+
+    model.eval()
+
+    targets_record_list = []
+    outputs_record_list = []
+    with torch.no_grad():
+        for batch_idx, (inputs, targets) in enumerate(test_loader):
+            inputs = inputs.to(torch_device)
+            targets = targets.to(torch_device)
+            # targets = targets[:, -1, :]
+            targets = targets[:, -1, 0].view(-1,1)
+            for i in range(len(inputs)):
+                input = inputs[i].unsqueeze(0)  # Add batch dimension
+                target = targets[i].unsqueeze(0)  # Add batch dimension
+
+                # print(f"Sample index: {i}")
+                # print(f"Sample shape: {input.shape}")
+                # print(f"Label shape: {target.shape}")
+
+                # Forward pass
+                # Input size torch.Size([1, 20, 4]) [batch_size, , seq_length, 4]
+                # Output size torch.Size([1, 1])    [batch_size, 1]
+                output = model(input)
+                loss = criterion(output, target)
+
+                # print(f"Sample index: {i}")
+                # # print(f"Sample shape: {input}")
+                # print(f"Label shape: {target.shape}")
+                # print(f"Output shape: {output.shape}")
                 
-    #             targets_record_list.append(target)
-    #             outputs_record_list.append(output)
+                targets_record_list.append(target)
+                outputs_record_list.append(output)
 
-    # targets_record = torch.cat(targets_record_list, dim=0)
-    # outputs_record = torch.cat(outputs_record_list, dim=0)
+    targets_record = torch.cat(targets_record_list, dim=0)
+    outputs_record = torch.cat(outputs_record_list, dim=0)
+
+    denormalized_targets_record = denormalize(targets_record, fric_min, fric_max, action_target_min, action_target_max)
+    denormalized_outputs_record = denormalize(outputs_record, fric_min, fric_max, action_target_min, action_target_max)
+    
+    record = torch.hstack((denormalized_targets_record.unsqueeze(1), denormalized_outputs_record.unsqueeze(1)))
+
+    print(record.shape)
+
+    record = record.tolist()
+
+    print(np.array(record).shape)
+
+    record = np.array(record)[:,:,0]
+
+    targets = record[:, 0]
+    predictions = record[:, 1]
+
+    # Compute Mean Squared Error
+    mse = np.mean((targets - predictions) ** 2)
+
+    # Compute Root Mean Squared Error
+    rmse = np.sqrt(mse)
+
+    print("RMSE")
+    print(rmse)
+
+    # Define the column names (optional)
+    # columns = ["Target Friction", "Target CoM x", "Target CoM y", "Output Friction", "Output CoM x", "Output CoM y"]
+    columns = ["Target Friction", "Output Friction"]
+
+    # Create a wandb Table
+    table = wandb.Table(data=record, columns=columns)
+
+    # Log the table to wandb
+    wandb.log({"my_table": table})
 
     # denormalised_target_dynamic_fric_data = ((targets_record - target_range_min) / (target_range_max - target_range_min)) * (dynamic_fric_max - dynamic_fric_min) + dynamic_fric_min
     # # denormalised_target_dynamic_fric_data = ((targets_record[:,0] - target_range_min) / (target_range_max - target_range_min)) * (dynamic_fric_max - dynamic_fric_min) + dynamic_fric_min

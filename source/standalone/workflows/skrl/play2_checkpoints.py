@@ -111,13 +111,27 @@ def main():
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
     max_episode_length = env.unwrapped.max_episode_length
-    max_total_episode_num = 10
+    max_total_episode_num = 2000
     memory_size = max_episode_length*max_total_episode_num  # experiment_cfg["agent"]["rollouts"]  # memory_size is the agent's number of rollouts
     memory = RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
+    
+    observation_shape = env.observation_space.shape  # This should be (num_envs, 8)
+    action_shape = env.action_space.shape  # This should be (num_envs, 1)  
+
+    memory.create_tensor(name="states", size=observation_shape[0], dtype=torch.float32)
+    memory.create_tensor(name="actions", size=action_shape[0], dtype=torch.float32)
+    memory.create_tensor(name="rewards", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="terminated", size=env.num_envs, dtype=torch.bool)
+    memory.create_tensor(name="truncated", size=env.num_envs, dtype=torch.bool)
+    memory.create_tensor(name="log_prob", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="values", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="returns", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="advantages", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="props", size=3, dtype=torch.float32)
 
     agent = PPO_RNN(
         models=models,
-        memory=memory,  # memory is optional during evaluation
+        memory=None,  # memory is optional during evaluation
         cfg=agent_cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,
@@ -177,7 +191,7 @@ def main():
             obs, rewards, terminated, truncated, infos = env.step(actions)
 
             memory.add_samples(states=obs, actions=actions, rewards=rewards, 
-                                    terminated=terminated, truncated=truncated)
+                                    terminated=terminated, truncated=truncated, props=infos["prop"])
 
             # infos["log"] = {"tttt": torch.tensor(3.14)}
             # print(infos)
@@ -224,7 +238,8 @@ def main():
     checkpoint_date = args_cli.checkpoint.split(os.sep)[-3]
     filename = os.path.splitext(os.path.basename(args_cli.checkpoint))[0]
     memory_path = os.path.join(log_memory_dir, checkpoint_date, filename)
-    agent.memory.save(memory_path)
+    # agent.memory.save(memory_path)
+    memory.save(memory_path)
 
     # close the simulator
     env.close()
