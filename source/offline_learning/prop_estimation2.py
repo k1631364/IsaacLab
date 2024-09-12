@@ -336,20 +336,20 @@ def main():
 
     position_index = [0, 1, 3, 4]
     rotation_index = 2
-    # velocity_index = [3, 4, 7, 8, 9, 10]
+    velocity_index = [5, 6]
 
     # Extract features
     positions = all_data_tensor[:, :, position_index]
     rotation = all_data_tensor[:, :, rotation_index]
-    # velocities = all_data_tensor[:, :, velocity_index]
+    velocities = all_data_tensor[:, :, velocity_index]
 
     # Compute min and max for each feature category
     pos_min = positions.min()
     pos_max = positions.max()
     rot_min = rotation.min()
     rot_max = rotation.max()
-    # vel_min = velocities.min()
-    # vel_max = velocities.max()
+    vel_min = velocities.min()
+    vel_max = velocities.max()
 
     feature_target_min = -0.9
     feature_target_max = 0.9
@@ -357,15 +357,13 @@ def main():
     # Normalize features
     normalized_positions = normalize(positions, pos_min, pos_max, feature_target_min, feature_target_max)
     normalized_rotation = normalize(rotation, rot_min, rot_max, feature_target_min, feature_target_max)
-    # normalized_velocities = normalize(velocities, vel_min, vel_max, feature_target_min, feature_target_max)
+    normalized_velocities = normalize(velocities, vel_min, vel_max, feature_target_min, feature_target_max)
 
     # Reconstruct the normalized data tensor
     normalized_data = all_data_tensor.clone()
     normalized_data[:, :, position_index] = normalized_positions
     normalized_data[:, :, rotation_index] = normalized_rotation
-    # normalized_data[:, :, velocity_index] = normalized_velocities
-
-    print(normalized_data.shape)
+    normalized_data[:, :, velocity_index] = normalized_velocities
 
     # Define index for position, rotation, and velocity features
     friction_index = 0
@@ -419,7 +417,7 @@ def main():
     hidden_size = 64    # Number of features in hidden state
     num_layers = 1      # Number of LSTM layers
     output_size = 1     # Number of physical properties (e.g., friction, CoM)
-    num_epochs = 1000
+    num_epochs = 2
     learning_rate = 0.001
 
     model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
@@ -471,13 +469,13 @@ def main():
 
         "position_index": position_index, 
         "rotation_index": rotation_index, 
-        # "velocity_index": velocity_index, 
+        "velocity_index": velocity_index, 
         "pos_min": pos_min, 
         "pos_max": pos_max, 
         "rot_min": rot_min, 
         "rot_max": rot_max, 
-        # "vel_min": vel_min, 
-        # "vel_max": vel_max, 
+        "vel_min": vel_min, 
+        "vel_max": vel_max, 
         "feature_target_min": feature_target_min, 
         "feature_target_max": feature_target_max,
 
