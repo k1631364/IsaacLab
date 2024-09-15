@@ -165,6 +165,7 @@ def main():
     all_labels_list = []
     # Read memories
     memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-09-10_13-09-18_test2"    
+    # /workspace/isaaclab/logs/skrl/sliding_direct_test/2024-09-10_13-09-18
     for memory_dir in os.listdir(memories_path):
         print(memory_dir)
 
@@ -173,6 +174,10 @@ def main():
         
         files = [f for f in os.listdir(memory_path) if os.path.isfile(os.path.join(memory_path, f))]
         # print(files)
+
+        # numbers = re.findall(r'\d+', checkpoint_file)
+        # if numbers:
+        #     number_part = int(numbers[0])
 
         memory_filename = os.path.join(memory_path, files[0])
         print(memory_filename)
@@ -417,7 +422,7 @@ def main():
     hidden_size = 64    # Number of features in hidden state
     num_layers = 1      # Number of LSTM layers
     output_size = 1     # Number of physical properties (e.g., friction, CoM)
-    num_epochs = 2
+    num_epochs = 1000
     learning_rate = 0.001
 
     model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
