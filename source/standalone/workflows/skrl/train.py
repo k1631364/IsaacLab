@@ -178,7 +178,7 @@ def main():
         observation_space=env.observation_space,
         action_space=env.action_space,
         device=env.device,
-        memory_all=memory_all, 
+        # memory_all=memory_all, 
     )
 
     # configure and instantiate a custom RL trainer for logging episode events
