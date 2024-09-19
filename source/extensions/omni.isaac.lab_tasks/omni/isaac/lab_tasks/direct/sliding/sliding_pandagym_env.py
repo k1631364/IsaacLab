@@ -51,7 +51,7 @@ class EventCfg:
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
           "dynamic_friction_range": (0.05, 0.3),
-          "restitution_range": (0.6, 0.6),  # (1.0, 1.0),  
+          "restitution_range": (1.0, 1.0),  # (1.0, 1.0),  
         #   "com_rad": 0.032, 
         #   "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
         #   "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
@@ -61,20 +61,20 @@ class EventCfg:
       },
   )
 
-  @configclass
-  class EventCfg:
-    robot_physics_material_table = EventTerm(
-        func=mdp.randomize_rigid_body_material,
-        mode="reset",
-        params={
-            "asset_cfg": SceneEntityCfg("cuboidtable2"),
-            "static_friction_range": (0.5, 0.5),
-          "dynamic_friction_range": (0.5, 0.5),
-          "restitution_range": (0.6, 0.6),
-            "mass_range": (30.0, 30.0),
-            "num_buckets": 250,
-        },
-    )
+#   @configclass
+#   class EventCfg:
+#     robot_physics_material_table = EventTerm(
+#         func=mdp.randomize_rigid_body_material,
+#         mode="reset",
+#         params={
+#             "asset_cfg": SceneEntityCfg("cuboidtable2"),
+#             "static_friction_range": (0.5, 0.5),
+#           "dynamic_friction_range": (0.5, 0.5),
+#           "restitution_range": (0.6, 0.6),
+#             "mass_range": (30.0, 30.0),
+#             "num_buckets": 250,
+#         },
+#     )
 
 # class EventCfg:
 #   robot_physics_material = EventTerm(
@@ -289,7 +289,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
     episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 11
+    num_observations = 12
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -349,12 +349,12 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.goal_location_max = 0.75
         self.goal_location_min_x = 0.0
         self.goal_location_max_x = 0.75
-        self.goal_location_min_y = -0.1
-        self.goal_location_max_y = 0.1
+        self.goal_location_min_y = -0.3
+        self.goal_location_max_y = 0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
-        self.discrete_goals_x = torch.tensor([0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
+        self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
-        self.discrete_goal = True
+        self.discrete_goal = False
         
         # Normalisaion range: goal
         # self.goal_location_normmax = 2.0
@@ -535,7 +535,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print("Actions data")
         # print(self.actions.unsqueeze(0).shape)
         self.past_action_prop.append(self.actions.unsqueeze(0))
-
+        self.past_action_prop = self.past_action_prop[-self.past_timestep_prop:]
 
     def _apply_action(self) -> None:
         # print("Env apply action called!!!!")
@@ -782,13 +782,20 @@ class SlidingPandaGymEnv(DirectRLEnv):
         normalized_past_obs_prop[:, :, position_index] = normalized_positions
         normalized_past_obs_prop[:, :, rotation_index] = normalized_rotation
 
-        self.past_action_prop = self.past_action_prop[-self.past_timestep_prop:]
         past_action_prop_tensor = torch.cat(self.past_action_prop, dim=0)
 
         velocities = past_action_prop_tensor
         normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
         normalized_past_action_prop = past_action_prop_tensor.clone()
         normalized_past_action_prop = normalized_velocities
+
+        # print("Check past obs shape")
+        # print(self.episode_length_buf)
+        # print(self.past_obs_prop[10][0,1,:])
+        # print(self.past_obs_prop[11][0,1,:])
+        # print(self.past_obs_prop[12][0,1,:])
+        # print(self.past_obs_prop[13][0,1,:])
+        # print(self.past_obs_prop[14][0,1,:])
 
         rnn_prop_input = torch.cat((normalized_past_obs_prop, normalized_past_action_prop), dim=2)
         rnn_prop_input = rnn_prop_input.swapaxes(0, 1)
@@ -815,9 +822,9 @@ class SlidingPandaGymEnv(DirectRLEnv):
 
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalsied_estimated_prop), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)
         
         # denormalsied_estimated_prop
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
@@ -1049,6 +1056,21 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.obs_vel_noise_epi[env_ids, :] = self.obs_vel_noise_epi_new
 
         # Past obs (prop) 
+        # print("Past obs shapeee")
+        # print(len(self.past_obs_prop))
+        # print("Past actions shapeee")
+        # print(len(self.past_action_prop))
+        # print(self.past_obs_prop[0].shape)
+        # print(self.past_action_prop[0].shape)
+        # print("reset env ids")
+        # print(env_ids.shape)
+        selected_envs = env_ids.tolist()
+        # print(selected_envs)
+        for tensor in self.past_obs_prop:
+            tensor[0, selected_envs, :] = 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+
+        # self.past_obs_prop = [self.initial_obs_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
+        # self.past_action_prop = [self.initial_action_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
 
         # Reset goal
         # curr_success_rate = self.extras.get('log')

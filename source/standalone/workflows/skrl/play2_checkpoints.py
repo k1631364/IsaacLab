@@ -190,6 +190,9 @@ def main():
 
             obs, rewards, terminated, truncated, infos = env.step(actions)
 
+            # print("Obs shapeeeee")
+            # print(obs.shape) # [1, 12]
+
             memory.add_samples(states=obs, actions=actions, rewards=rewards, 
                                     terminated=terminated, truncated=truncated, props=infos["prop"])
 

@@ -187,6 +187,8 @@ def main():
     trainer = SkrlSequentialLogTrainer(cfg=trainer_cfg, env=env, agents=agent)
 
     print("Before expeirmnet start!!!!!!!!!!!!!!!!!!!!!!!")
+    print("Log dir")
+    print(log_dir)
 
     # train the agent
     trainer.train()
