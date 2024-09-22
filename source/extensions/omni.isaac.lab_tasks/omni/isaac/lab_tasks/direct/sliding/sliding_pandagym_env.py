@@ -119,6 +119,7 @@ class SlidingPandaGymEnvCfg(DirectRLEnvCfg):
 
     events: EventCfg = EventCfg()
 
+    # Noise
     # at every time-step add gaussian noise + bias. The bias is a gaussian sampled at reset
     action_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(
         noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.05, operation="add"),
@@ -385,13 +386,9 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.past_timestep = 1
         initial_pos_tensor = torch.zeros(self.past_timestep, self.num_envs, len(self.state_pos_idx), device=self.scene.env_origins.device)
         initial_vel_tensor = torch.zeros(self.past_timestep, self.num_envs, len(self.state_vel_idx), device=self.scene.env_origins.device)
-        # self.past_pusher_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_pusher_pos = [initial_pos_tensor]
-        # self.past_puck_pos = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_pos = [initial_pos_tensor]
-        # self.past_pusher_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_pusher_vel = [initial_vel_tensor]
-        # self.past_puck_vel = torch.zeros((self.scene.env_origins.shape[0], self.past_timestep), device=self.scene.env_origins.device)
         self.past_puck_vel = [initial_vel_tensor]
 
         # Past state tracking for RNN prop estimation
@@ -404,37 +401,33 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.initial_action_tensor_prop = torch.zeros(1, self.num_envs, 2, device=self.scene.env_origins.device)
         self.past_action_prop = [self.initial_action_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
 
-        # print(len(self.past_pusher_pos_prop))   
-
-        # print(torch.cat(self.past_puck_pos_prop, dim=0).shape)  
-        # print(torch.cat(self.past_pusher_pos_prop, dim=0).shape)  
-        # import time 
-        # time.sleep(300)
-        
         self.curriculum_count = 0
 
-        # Embeddings
-        embedding_lookuptable_path = "/workspace/isaaclab/logs/exp_lookuptable/predefined/dynamicfriction_z2.pkl"
-        with open(embedding_lookuptable_path, "rb") as fp: 
-            self.embedding_lookuptable = pickle.load(fp)
+        ### Embeddings ###
+        # embedding_lookuptable_path = "/workspace/isaaclab/logs/exp_lookuptable/predefined/dynamicfriction_z2.pkl"
+        # with open(embedding_lookuptable_path, "rb") as fp: 
+        #     self.embedding_lookuptable = pickle.load(fp)
 
-        # min_values_all = self.embedding_lookuptable.min()
-        # max_values_all = self.embedding_lookuptable.max()
+        # # min_values_all = self.embedding_lookuptable.min()
+        # # max_values_all = self.embedding_lookuptable.max()
 
-        # self.min_values = min_values_all[[0, 1]].values
-        # self.max_values = max_values_all[[0, 1]].values
+        # # self.min_values = min_values_all[[0, 1]].values
+        # # self.max_values = max_values_all[[0, 1]].values
 
-        self.min_value_global = self.embedding_lookuptable[[0, 1]].min().min()
-        self.max_value_global = self.embedding_lookuptable[[0, 1]].max().max()
+        # self.min_value_global = self.embedding_lookuptable[[0, 1]].min().min()
+        # self.max_value_global = self.embedding_lookuptable[[0, 1]].max().max()
 
-        # print("Min max valuessss")
-        # print(self.min_value_global)
-        # print(self.max_value_global)
+        # # print("Min max valuessss")
+        # # print(self.min_value_global)
+        # # print(self.max_value_global)
 
-        # print(self.embedding_lookuptable.shape) 
+        # # print(self.embedding_lookuptable.shape) 
 
-        # Prop estimation
-        # prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-08-20_13-18-59/model/model_params_dict.pkl"
+        ### Embeddings ###  
+
+        ### Prop estimation (offline) ###
+
+        # Load the learnt model info
         prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-09-13_13-27-32/model/model_params_dict.pkl"
         with open(prop_estimator_dict_path, "rb") as fp: 
             self.prop_estimator_dict = pickle.load(fp)
@@ -467,6 +460,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.action_target_min = self.prop_estimator_dict["action_target_min"] 
         self.action_target_max = self.prop_estimator_dict["action_target_max"]
 
+        # Episodic noises
         self.obs_pos_noise_epi = torch.normal(self.cfg.obs_pos_noise_mean, self.cfg.obs_pos_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
         self.obs_vel_noise_epi = torch.normal(self.cfg.obs_vel_noise_mean, self.cfg.obs_vel_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
 
@@ -518,7 +512,6 @@ class SlidingPandaGymEnv(DirectRLEnv):
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
-
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         # print("Env pre-physics called!!!!")
         self.actions = self.action_scale * actions.clone()
@@ -532,6 +525,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         # print(self.actions.shape)
         # pass
 
+        ### Action data tracking for rnn prop estimation ###
         # print("Actions data")
         # print(self.actions.unsqueeze(0).shape)
         self.past_action_prop.append(self.actions.unsqueeze(0))
@@ -588,109 +582,53 @@ class SlidingPandaGymEnv(DirectRLEnv):
         curr_cuboidpusher2_state[:, 0:3] = (
             curr_cuboidpusher2_state[:, 0:3] - self.scene.env_origins
         )
-        # self.past_pusher_pos = torch.cat((self.past_pusher_pos,  curr_cuboidpusher2_state[:, 0].reshape((-1,1))), dim=1)
-        # past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
-        # normalized_past_pusher_pos_obs = (past_pusher_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        
+
+        # Pusher pos
         normalized_curr_pusher_pos = (curr_cuboidpusher2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        # self.past_pusher_pos = torch.cat((self.past_pusher_pos, normalized_curr_pusher_pos.reshape((-1, 1))), dim=1)
         self.past_pusher_pos.append(normalized_curr_pusher_pos.unsqueeze(0))
         self.past_pusher_pos = self.past_pusher_pos[-self.past_timestep:]
-        # past_pusher_pos_tensor = torch.stack(self.past_pusher_pos)
         past_pusher_pos_tensor = torch.cat(self.past_pusher_pos, dim=0)
-        # print("Pusher possssss")
-        # print(normalized_curr_pusher_pos.unsqueeze(0).shape)
-        # print(past_pusher_pos_tensor.shape)
         normalized_past_pusher_pos_obs  = past_pusher_pos_tensor[-self.past_timestep:, :, :]
-        # normalized_past_pusher_pos_obs  = self.past_pusher_pos[:, -self.past_timestep:]
-        # print(normalized_past_pusher_pos_obs.shape)
 
-        # prop rnn (pusher)
-        self.past_pusher_pos_prop.append(normalized_curr_pusher_pos.unsqueeze(0))
-        self.past_pusher_pos_prop = self.past_pusher_pos_prop[-self.past_timestep_prop:]
-        past_pusher_pos_prop_tensor = torch.cat(self.past_pusher_pos_prop, dim=0)
-        normalized_past_pusher_pos_prop_obs  = past_pusher_pos_prop_tensor[-self.past_timestep_prop:, :, :]
-
-        # self.past_pusher_vel = torch.cat((self.past_pusher_vel,  curr_cuboidpusher2_state[:, 7].reshape((-1,1))), dim=1)
-        # past_pusher_vel_obs = self.past_pusher_vel[:, -self.past_timestep:]
-        # normalized_past_pusher_vel_obs = (past_pusher_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-
+        # Pusher vel
         normalized_curr_pusher_vel = (curr_cuboidpusher2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        # self.past_pusher_vel = torch.cat((self.past_pusher_vel, normalized_curr_pusher_vel.reshape((-1,1))), dim=1)
         self.past_pusher_vel.append(normalized_curr_pusher_vel.unsqueeze(0))
         self.past_pusher_vel = self.past_pusher_vel[-self.past_timestep:]
         past_pusher_vel_tensor = torch.cat(self.past_pusher_vel, dim=0)
-        # normalized_past_pusher_vel_obs  = self.past_pusher_vel[:, -self.past_timestep:]
         normalized_past_pusher_vel_obs  = past_pusher_vel_tensor[-self.past_timestep:, :, :]
         
         # Puck state
         curr_cylinderpuck2_state = self.cylinderpuck2_state.clone()
-        # print("puck state")
-        # print(curr_cylinderpuck2_state[:, 6])
         curr_cylinderpuck2_state[:, 0:3] = (
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )
-        # self.past_puck_pos = torch.cat((self.past_puck_pos,  curr_cylinderpuck2_state[:, 0].reshape((-1,1))), dim=1)
-        # past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
-        # normalized_past_puck_pos_obs = (past_puck_pos_obs - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
 
+        # Puck pos
         normalized_curr_puck_pos = (curr_cylinderpuck2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        # self.past_puck_pos = torch.cat((self.past_puck_pos, normalized_curr_puck_pos.reshape((-1,1))), dim=1)
         self.past_puck_pos.append(normalized_curr_puck_pos.unsqueeze(0))
         self.past_puck_pos = self.past_puck_pos[-self.past_timestep:]
         past_puck_pos_tensor = torch.cat(self.past_puck_pos, dim=0)
-        # normalized_past_puck_pos_obs  = self.past_puck_pos[:, -self.past_timestep:]
         normalized_past_puck_pos_obs  = past_puck_pos_tensor
 
-        # prop rnn seq data (puck)
-        # print("Pos data")
-        # print(normalized_curr_puck_pos.unsqueeze(0).shape)
-        # self.past_puck_pos_prop.append(normalized_curr_puck_pos.unsqueeze(0))
-        # self.past_puck_pos_prop = self.past_puck_pos_prop[-self.past_timestep_prop:]
-        # past_puck_pos_prop_tensor = torch.cat(self.past_puck_pos_prop, dim=0)
-        # normalized_past_puck_pos_prop_obs  = past_puck_pos_prop_tensor
-        # print("past data len")
-        # print(len(self.past_puck_pos_prop))
-
-        # print(torch.cat(self.past_puck_pos_prop, dim=0).shape)  
-        # print(torch.cat(self.past_pusher_pos_prop, dim=0).shape) 
-        # print(len(self.past_puck_pos_prop)) 
-        # print("prop input")
-        # print(torch.cat(self.past_puck_pos_prop, dim=0))  
-        # print(torch.cat(self.past_pusher_pos_prop, dim=0)) 
-        # print(normalized_past_puck_pos_prop_obs.shape)
-        # print(normalized_past_pusher_pos_prop_obs.shape)
-        # import time 
-        # time.sleep(300)
-        
-        # self.past_puck_vel = torch.cat((self.past_puck_vel,  curr_cylinderpuck2_state[:, 7].reshape((-1,1))), dim=1)
-        # past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
-        # normalized_past_puck_vel_obs = (past_puck_vel_obs - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        
+        # Puck vel
         normalized_curr_puck_vel = (curr_cylinderpuck2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        # self.past_puck_vel = torch.cat((self.past_puck_vel, normalized_curr_puck_vel.reshape((-1,1))), dim=1)
         self.past_puck_vel.append(normalized_curr_puck_vel.unsqueeze(0))
         self.past_puck_vel = self.past_puck_vel[-self.past_timestep:]
-        # print("Past puck vel array")
-        # print(len(self.past_puck_vel))
         past_puck_vel_tensor = torch.cat(self.past_puck_vel, dim=0)
-        # normalized_past_puck_vel_obs  = self.past_puck_vel[:, -self.past_timestep:]
         normalized_past_puck_vel_obs  = past_puck_vel_tensor
         
         # Goal
-        goal_tensor = self.goal_locations[:,0].clone()
-        normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
+        # goal_tensor = self.goal_locations[:,0].clone()
+        # normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
         goal_tensor_x = self.goal_locations[:,0].clone()
         normalized_goal_tensor_x = (goal_tensor_x - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
         normalized_goal_tensor_x = normalized_goal_tensor_x.view(-1,1)
         goal_tensor_y = self.goal_locations[:,1].clone()
         normalized_goal_tensor_y = (goal_tensor_y - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
         normalized_goal_tensor_y = normalized_goal_tensor_y.view(-1,1)
-        
-        # print("Goall")
-        # print(normalized_goal_tensor)
 
-        # Friction
+        # Properties
+        # Materials
         curr_materials = self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_material_properties()
         static_frictions = curr_materials.squeeze().reshape((-1,3))[:,0].to(self.scene.env_origins.device)
         dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
@@ -700,6 +638,7 @@ class SlidingPandaGymEnv(DirectRLEnv):
         dynamic_frictions_max = 0.3
         normalized_dynamic_frictions = (dynamic_frictions - dynamic_frictions_min) / (dynamic_frictions_max - dynamic_frictions_min)
 
+        # CoM
         curr_coms = self.scene.rigid_objects["cylinderpuck2"].root_physx_view.get_coms()
         com_x = curr_coms[:,0].to(self.scene.env_origins.device)
         com_y = curr_coms[:,1].to(self.scene.env_origins.device)
@@ -709,39 +648,30 @@ class SlidingPandaGymEnv(DirectRLEnv):
         normalized_com_x = (com_x - com_min) / (com_max - com_min)
         normalized_com_y = (com_y - com_min) / (com_max - com_min)
         normalized_com_z = (com_z - com_min) / (com_max - com_min)
-        # dynamic_frictions = curr_materials.squeeze().reshape((-1,3))[:,1].to(self.scene.env_origins.device)
-        # restitutions = curr_materials.squeeze().reshape((-1,3))[:,2].to(self.scene.env_origins.device)
-        # print("Current materislaaass")
-        # print(com_z)
-        # torch.Size([32, 1, 3])
 
-        # print("dynamic_frictions")
-        # print(dynamic_frictions)
-        # print("CoM")
-        # print(com_x)
-        # print(com_y)
+        ### Embeddings ### 
+        # # print("Dynamic Frictionsssss: should be (32,1)")
+        # dynamic_frictions_np = dynamic_frictions.cpu().detach().numpy().reshape(self.num_envs, -1)
+        # # print(dynamic_frictions_np.shape)
+        # # print(self.embedding_lookuptable[['dynamic friction']].shape)
 
-        # Embeddings
-        # print("Dynamic Frictionsssss: should be (32,1)")
-        dynamic_frictions_np = dynamic_frictions.cpu().detach().numpy().reshape(self.num_envs, -1)
-        # print(dynamic_frictions_np.shape)
-        # print(self.embedding_lookuptable[['dynamic friction']].shape)
+        # neigh_dynamicfric = NearestNeighbors(n_neighbors=1)
+        # neigh_dynamicfric.fit(self.embedding_lookuptable[['dynamic friction']].to_numpy())
 
-        neigh_dynamicfric = NearestNeighbors(n_neighbors=1)
-        neigh_dynamicfric.fit(self.embedding_lookuptable[['dynamic friction']].to_numpy())
+        # dynamicfric_match_indices = neigh_dynamicfric.kneighbors(dynamic_frictions_np, return_distance=False)
+        # # print("Look up table")
+        # # print(self.embedding_lookuptable)
+        # dynamicfric_matches = self.embedding_lookuptable.iloc[dynamicfric_match_indices.flatten()][[0, 1]]
+        # dynamicfric_matches_np= dynamicfric_matches.to_numpy()
 
-        dynamicfric_match_indices = neigh_dynamicfric.kneighbors(dynamic_frictions_np, return_distance=False)
-        # print("Look up table")
-        # print(self.embedding_lookuptable)
-        dynamicfric_matches = self.embedding_lookuptable.iloc[dynamicfric_match_indices.flatten()][[0, 1]]
-        dynamicfric_matches_np= dynamicfric_matches.to_numpy()
+        # dynamicfric_matches_normalized_np = (dynamicfric_matches_np - self.min_value_global) / (self.max_value_global - self.min_value_global)
 
-        dynamicfric_matches_normalized_np = (dynamicfric_matches_np - self.min_value_global) / (self.max_value_global - self.min_value_global)
+        # # print("This should be all sameeeee")
+        # # print(dynamicfric_matches_normalized_np)
 
-        # print("This should be all sameeeee")
-        # print(dynamicfric_matches_normalized_np)
+        # dynamicfric_matches_tensor = torch.from_numpy(dynamicfric_matches_normalized_np).to(self.device)
 
-        dynamicfric_matches_tensor = torch.from_numpy(dynamicfric_matches_normalized_np).to(self.device)
+        ### Embeddings (finish) ###
 
         # Check if Puck unreachable
         unreachable_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_pusher_posx
@@ -803,30 +733,19 @@ class SlidingPandaGymEnv(DirectRLEnv):
         self.rnn_prop_model.eval()
         with torch.no_grad():
             normalsied_estimated_prop = self.rnn_prop_model(rnn_prop_input)
-            normalsied_estimated_prop.detach()
+            # normalsied_estimated_prop.detach()
         
         denormalsied_estimated_prop = denormalize(normalsied_estimated_prop, self.fric_min, self.fric_max, self.action_target_min, self.action_target_max)
-        denormalsied_estimated_prop.detach()
-
-        # print("Fric")
-        # print(denormalsied_estimated_prop)
-        # print(normalized_dynamic_frictions)
-
-        # print("state shape")
-        # print(curr_cylinderpuck2_state[:, 6].view(-1,1).shape)
-        # print(normalized_past_puck_pos_obs_x.shape)
-
-        # print(normalsied_estimated_prop.shape)
-        # print(normalized_dynamic_frictions.view(-1,1).shape)
-        # print(normalsied_estimated_prop)
+        # denormalsied_estimated_prop.detach()
+        
+        normalized_estimated_prop_rl = (denormalsied_estimated_prop - dynamic_frictions_min) / (dynamic_frictions_max - dynamic_frictions_min)
 
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalsied_estimated_prop), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)
-        
-        # denormalsied_estimated_prop
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, denormalsied_estimated_prop), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_prop_rl), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)
