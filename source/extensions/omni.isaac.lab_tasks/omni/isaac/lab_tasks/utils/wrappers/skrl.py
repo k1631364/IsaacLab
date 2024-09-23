@@ -114,7 +114,8 @@ def SkrlVecEnvWrapper(env: ManagerBasedRLEnv):
             f"The environment must be inherited from ManagerBasedRLEnv or DirectRLEnv. Environment type: {type(env)}"
         )
     # wrap and return the environment
-    return wrap_env(env, wrapper="isaac-orbit")
+    # return wrap_env(env, wrapper="isaac-orbit")
+    return wrap_env(env, wrapper="isaaclab")
 
 
 """
@@ -184,7 +185,7 @@ class SkrlSequentialLogTrainer(Trainer):
 
         """
         # init agent
-        self.agents.init(trainer_cfg=self.cfg)
+        # self.agents.init(trainer_cfg=self.cfg)
         self.agents.set_running_mode("train")
         # reset env
         states, infos = self.env.reset()

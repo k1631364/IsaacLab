@@ -355,6 +355,9 @@ class DirectRLEnv(gym.Env):
         if "prop" in self.obs_buf: 
             self.extras["prop"] = self.obs_buf['prop']
 
+        if "rnn_input" in self.obs_buf: 
+            self.extras["rnn_input"] = self.obs_buf['rnn_input']
+
         # print("Episode curr step")
         # print(self.episode_length_buf)
 
