@@ -63,6 +63,14 @@ agent:
       project: "isaac-sim-slidingtest"
       name: "" # wandb kwargs (see https://docs.wandb.ai/ref/python/init)
 
+prop_estimator: 
+  input_size: 7 # 11  # State and action concatenated size
+  hidden_size: 64    # Number of features in hidden state
+  num_layers: 1      # Number of LSTM layers
+  output_size: 1     # Number of physical properties (e.g., friction, CoM)
+  num_epochs: 1000
+  learning_rate: 0.001
+
 
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html

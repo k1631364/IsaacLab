@@ -15,6 +15,9 @@ from skrl.memories.torch import Memory
 from skrl.models.torch import Model
 from skrl.resources.schedulers.torch import KLAdaptiveLR
 
+import source.nn_models.RNN as rnnmodel
+import torch.optim as optim
+
 
 # [start-config-dict-torch]
 PPO_DEFAULT_CONFIG = {
@@ -64,8 +67,7 @@ PPO_DEFAULT_CONFIG = {
 }
 # [end-config-dict-torch]
 
-
-class PPO_RNN(Agent):
+class PPO_RNN_PROP(Agent):
     def __init__(self,
                  models: Mapping[str, Model],
                  memory: Optional[Union[Memory, Tuple[Memory]]] = None,
@@ -176,6 +178,20 @@ class PPO_RNN(Agent):
             self.checkpoint_modules["value_preprocessor"] = self._value_preprocessor
         else:
             self._value_preprocessor = self._empty_preprocessor
+        
+        print("Running ppo rnn proppppppp")
+        print(self.cfg["prop_estimator"]["input_size"])
+        #         prop_estimator: 
+        #   input_size: 7 # 11  # State and action concatenated size
+        #   hidden_size: 64    # Number of features in hidden state
+        #   num_layers: 1      # Number of LSTM layers
+        #   output_size: 1     # Number of physical properties (e.g., friction, CoM)
+        #   num_epochs: 1000
+        #   learning_rate: 0.001
+
+        # prop_model = rnnmodel.RNN(input_size, hidden_size, num_layers, output_size).to(self.device)
+        # prop_criterion = nn.MSELoss()
+        # prop_optimizer = optim.Adam(prop_model.parameters(), lr=learning_rate)
 
     def init(self, trainer_cfg: Optional[Mapping[str, Any]] = None) -> None:
         """Initialize the agent
@@ -428,8 +444,8 @@ class PPO_RNN(Agent):
         last_values = self._value_preprocessor(last_values, inverse=True)
 
         values = self.memory.get_tensor_by_name("values")
-        print("Memoryyyyy")
-        print(self.memory.get_tensor_by_name("rewards").shape)
+        # print("Memoryyyyy")
+        # print(self.memory.get_tensor_by_name("rewards").shape)
         returns, advantages = compute_gae(rewards=self.memory.get_tensor_by_name("rewards"),
                                           dones=self.memory.get_tensor_by_name("terminated"),
                                           values=values,

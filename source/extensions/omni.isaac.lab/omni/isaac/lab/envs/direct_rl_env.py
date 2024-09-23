@@ -249,6 +249,12 @@ class DirectRLEnv(gym.Env):
 
         obs = self._get_observations()
 
+        if "prop" in obs: 
+            self.extras["prop"] = obs['prop']
+
+        if "rnn_input" in obs: 
+            self.extras["rnn_input"] = obs['rnn_input']
+
         # return observations
         return obs, self.extras
 
