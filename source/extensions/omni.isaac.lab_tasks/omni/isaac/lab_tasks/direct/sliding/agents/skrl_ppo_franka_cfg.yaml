@@ -72,6 +72,8 @@ prop_estimator:
   train: True
   num_epochs: 8
 
+  # fric_min
+
 
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html

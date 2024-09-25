@@ -284,6 +284,9 @@ class PPO_RNN_PROP(Agent):
         # print(curr_rnn_prop_target.shape)
 
         output = self.prop_model(curr_rnn_prop_input)
+
+        denormalsied_output = denormalize(normalsied_output, self.fric_min, self.fric_max, self.action_target_min, self.action_target_max)
+
         rnn_loss = self.prop_criterion(output, curr_rnn_prop_target)
         # print(output)
         # print(loss)

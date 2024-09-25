@@ -202,8 +202,8 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
                 # print(states.shape)
                 # print(infos.keys()) 
                 # print(infos["rnn_input"].shape)
-                actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
-                # actions, log_prob, outputs, rnn_loss = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
+                # actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
+                actions, log_prob, outputs, rnn_loss = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
 
             # print("RNN losssss")
             # print(rnn_loss)
@@ -234,6 +234,7 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
             # print(infos)
             # if "log" in infos:
             #     infos["log"]["rnn_loss"] = rnn_loss
+            infos["log"]["rnn_loss"] = rnn_loss
             if "log" in infos:
                 for k, v in infos["log"].items():
                     if isinstance(v, torch.Tensor) and v.numel() == 1:
