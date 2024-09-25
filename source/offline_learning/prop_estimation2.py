@@ -440,6 +440,9 @@ def main():
             targets = targets[:, -1, 0].view(-1,1)
 
             # Forward pass
+            # print("Inputtttt")
+            # print(inputs.shape)
+            # print(targets.shape)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             

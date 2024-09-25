@@ -68,8 +68,9 @@ prop_estimator:
   hidden_size: 64    # Number of features in hidden state
   num_layers: 1      # Number of LSTM layers
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
-  num_epochs: 1000
   learning_rate: 0.001
+  train: True
+  num_epochs: 8
 
 
 # Sequential trainer

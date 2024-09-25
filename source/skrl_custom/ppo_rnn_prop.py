@@ -180,18 +180,29 @@ class PPO_RNN_PROP(Agent):
             self._value_preprocessor = self._empty_preprocessor
         
         print("Running ppo rnn proppppppp")
-        print(self.cfg["prop_estimator"]["input_size"])
-        #         prop_estimator: 
-        #   input_size: 7 # 11  # State and action concatenated size
-        #   hidden_size: 64    # Number of features in hidden state
-        #   num_layers: 1      # Number of LSTM layers
-        #   output_size: 1     # Number of physical properties (e.g., friction, CoM)
-        #   num_epochs: 1000
-        #   learning_rate: 0.001
+        # print(self.cfg["prop_estimator"]["input_size"])
+        
+        input_size = self.cfg["prop_estimator"]["input_size"]  # State and action concatenated size
+        hidden_size = self.cfg["prop_estimator"]["hidden_size"]    # Number of features in hidden state
+        num_layers = self.cfg["prop_estimator"]["num_layers"]      # Number of LSTM layers
+        output_size = self.cfg["prop_estimator"]["output_size"]     # Number of physical properties (e.g., friction, CoM)
+        self.num_epochs = self.cfg["prop_estimator"]["num_epochs"]
+        learning_rate = self.cfg["prop_estimator"]["learning_rate"]
 
-        # prop_model = rnnmodel.RNN(input_size, hidden_size, num_layers, output_size).to(self.device)
-        # prop_criterion = nn.MSELoss()
-        # prop_optimizer = optim.Adam(prop_model.parameters(), lr=learning_rate)
+        print(input_size)
+        print(learning_rate)
+
+        self.prop_model = rnnmodel.RNN(input_size, hidden_size, num_layers, output_size).to(self.device)
+        self.prop_criterion = nn.MSELoss()
+        self.prop_optimizer = optim.Adam(self.prop_model.parameters(), lr=learning_rate)
+
+        if self.cfg["prop_estimator"]["train"]: 
+            self.prop_model.train()
+        else: 
+            self.prop_model.eval()
+
+        self.curr_rollout_rnn_input = []
+        self.curr_rollout_rnn_target = []
 
     def init(self, trainer_cfg: Optional[Mapping[str, Any]] = None) -> None:
         """Initialize the agent
@@ -261,6 +272,37 @@ class PPO_RNN_PROP(Agent):
         :return: Actions
         :rtype: torch.Tensor
         """
+
+        curr_rnn_prop_input = infos["rnn_input"]
+        self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
+
+        curr_rnn_prop_target = infos["prop"][:,0].reshape(-1,1)
+        self.curr_rollout_rnn_target.append(curr_rnn_prop_target)
+
+        # print("Current shapeeeee")
+        # print(curr_rnn_prop_input.shape)
+        # print(curr_rnn_prop_target.shape)
+
+        output = self.prop_model(curr_rnn_prop_input)
+        rnn_loss = self.prop_criterion(output, curr_rnn_prop_target)
+        # print(output)
+        # print(loss)
+
+        # with torch.no_grad():
+        #     for batch_idx, (inputs, targets) in enumerate(test_loader):
+        #         inputs = inputs.to(torch_device)
+        #         targets = targets.to(torch_device)
+        #         # targets = targets[:, -1, :]
+        #         targets = targets[:, -1, 0].view(-1,1)
+        #         for i in range(len(inputs)):
+        #             input = inputs[i].unsqueeze(0)  # Add batch dimension
+        #             target = targets[i].unsqueeze(0)  # Add batch dimension
+
+        #             output = model(input)
+        #             loss = criterion(output, target)
+
+    
+        
         rnn = {"rnn": self._rnn_initial_states["policy"]} if self._rnn else {}
 
         # sample random actions
@@ -279,7 +321,7 @@ class PPO_RNN_PROP(Agent):
         if self._rnn:
             self._rnn_final_states["policy"] = outputs.get("rnn", [])
 
-        return actions, log_prob, outputs
+        return actions, log_prob, outputs, rnn_loss
 
     def record_transition(self,
                           states: torch.Tensor,
@@ -381,6 +423,7 @@ class PPO_RNN_PROP(Agent):
         if not self._rollout % self._rollouts and timestep >= self._learning_starts:
             self.set_mode("train")
             self._update(timestep, timesteps)
+            self._update_prop_estimator(timestep, timesteps)
             self.set_mode("eval")
 
         # write tracking data and checkpoints
@@ -561,3 +604,50 @@ class PPO_RNN_PROP(Agent):
 
         if self._learning_rate_scheduler:
             self.track_data("Learning / Learning rate", self.scheduler.get_last_lr()[0])
+
+    
+    def _update_prop_estimator(self, timestep: int, timesteps: int) -> None:
+        # print("Prop estimator update")
+
+        # print(len(self.curr_rollout_rnn_target))
+        # print(self.curr_rollout_rnn_target[13].shape)
+
+        # print("Current rnn prop input xxx")
+        # print(len(self.curr_rollout_rnn_input))
+        # print(self.curr_rollout_rnn_input[14].shape)
+
+        # print(self.num_epochs)
+        
+        for epoch in range(self.num_epochs):
+            for i, rnn_input in enumerate(self.curr_rollout_rnn_input): 
+                # print("RNN input shapeeeeeeeeeeeeeeeeeeee")
+                # print(rnn_input.shape)
+                # print(i)
+                # print(self.curr_rollout_rnn_target[i].shape)
+
+                targets = self.curr_rollout_rnn_target[i]
+                
+                outputs = self.prop_model(rnn_input)
+                loss = self.prop_criterion(outputs, targets)
+                
+                # Backward pass and optimization
+                self.prop_optimizer.zero_grad()
+                loss.backward()
+                self.prop_optimizer.step()
+            
+            # print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+
+            # # Record average loss after each epoch to weights and biases
+            # wandb.log({"loss": loss.item()})
+
+
+
+        self.curr_rollout_rnn_input = []
+        self.curr_rollout_rnn_target = []
+
+
+        # rewards = self.memory.get_tensor_by_name("rewards")
+        # states = self.memory.get_tensor_by_name("states")
+
+        # print(rewards.shape)
+        # print(states.shape)

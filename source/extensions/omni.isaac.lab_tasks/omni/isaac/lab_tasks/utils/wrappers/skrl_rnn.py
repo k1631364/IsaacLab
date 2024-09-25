@@ -203,6 +203,11 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
                 # print(infos.keys()) 
                 # print(infos["rnn_input"].shape)
                 actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
+                # actions, log_prob, outputs, rnn_loss = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
+
+            # print("RNN losssss")
+            # print(rnn_loss)
+            
             # step the environments
             next_states, rewards, terminated, truncated, infos = self.env.step(actions)
             # note: here we do not call render scene since it is done in the env.step() method
@@ -227,6 +232,8 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
             # single_value_tensor = torch.tensor(3.14)
             # infos["log"] = {"tttt": single_value_tensor}
             # print(infos)
+            # if "log" in infos:
+            #     infos["log"]["rnn_loss"] = rnn_loss
             if "log" in infos:
                 for k, v in infos["log"].items():
                     if isinstance(v, torch.Tensor) and v.numel() == 1:
