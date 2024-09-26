@@ -19,6 +19,13 @@ import source.nn_models.RNN as rnnmodel
 import torch.optim as optim
 
 
+def normalize(tensor, min_val, max_val, new_min, new_max):
+    return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
+
+def denormalize(tensor, min_val, max_val, new_min, new_max):
+    return (tensor - new_min) / (new_max - new_min) * (max_val - min_val) + min_val
+
+
 # [start-config-dict-torch]
 PPO_DEFAULT_CONFIG = {
     "rollouts": 16,                 # number of rollouts before updating
@@ -188,6 +195,21 @@ class PPO_RNN_PROP(Agent):
         output_size = self.cfg["prop_estimator"]["output_size"]     # Number of physical properties (e.g., friction, CoM)
         self.num_epochs = self.cfg["prop_estimator"]["num_epochs"]
         learning_rate = self.cfg["prop_estimator"]["learning_rate"]
+        self.position_index = self.cfg["prop_estimator"]["position_index"]
+        self.rotation_index = self.cfg["prop_estimator"]["rotation_index"]
+        self.velocity_index = self.cfg["prop_estimator"]["velocity_index"]
+        self.pos_min = self.cfg["prop_estimator"]["pos_min"]
+        self.pos_max = self.cfg["prop_estimator"]["pos_max"]
+        self.rot_min = self.cfg["prop_estimator"]["rot_min"]
+        self.rot_max = self.cfg["prop_estimator"]["rot_max"] 
+        self.vel_min = self.cfg["prop_estimator"]["vel_min"] 
+        self.vel_max = self.cfg["prop_estimator"]["vel_max"] 
+        self.feature_target_min = self.cfg["prop_estimator"]["feature_target_min"]   
+        self.feature_target_max = self.cfg["prop_estimator"]["feature_target_max"]   
+        self.fric_min = self.cfg["prop_estimator"]["fric_min"] 
+        self.fric_max = self.cfg["prop_estimator"]["fric_max"] 
+        self.estimate_target_min = self.cfg["prop_estimator"]["estimate_target_min"]   
+        self.estimate_target_max = self.cfg["prop_estimator"]["estimate_target_max"]    
 
         print(input_size)
         print(learning_rate)
@@ -274,22 +296,50 @@ class PPO_RNN_PROP(Agent):
         """
 
         curr_rnn_prop_input = infos["rnn_input"]
-        self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
+        normalized_curr_rnn_prop_input = curr_rnn_prop_input.clone()
+
+        position = curr_rnn_prop_input[:, :, self.position_index]
+        rotation = curr_rnn_prop_input[:, :, self.rotation_index]
+
+        normalized_position = normalize(position, self.pos_min, self.pos_max, self.feature_target_min, self.feature_target_max)
+        normalized_rotation = normalize(rotation, self.rot_min, self.rot_max, self.feature_target_min, self.feature_target_max)
+        
+        velocities = curr_rnn_prop_input[:, :, self.velocity_index]
+        normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
+
+        normalized_curr_rnn_prop_input[:, :, self.position_index] = normalized_position
+        normalized_curr_rnn_prop_input[:, :, self.rotation_index] = normalized_rotation
+        normalized_curr_rnn_prop_input[:, :, self.velocity_index] = normalized_velocities
+
+        self.curr_rollout_rnn_input.append(normalized_curr_rnn_prop_input)
+        # self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
 
         curr_rnn_prop_target = infos["prop"][:,0].reshape(-1,1)
-        self.curr_rollout_rnn_target.append(curr_rnn_prop_target)
+        frictions = curr_rnn_prop_target
+        normalized_friction = normalize(frictions, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+        normalized_curr_rnn_prop_target = normalized_friction
+
+        self.curr_rollout_rnn_target.append(normalized_curr_rnn_prop_target)
 
         # print("Current shapeeeee")
         # print(curr_rnn_prop_input.shape)
         # print(curr_rnn_prop_target.shape)
 
-        output = self.prop_model(curr_rnn_prop_input)
+        normalized_output = self.prop_model(normalized_curr_rnn_prop_input)
 
-        denormalsied_output = denormalize(normalsied_output, self.fric_min, self.fric_max, self.action_target_min, self.action_target_max)
+        denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
 
-        rnn_loss = self.prop_criterion(output, curr_rnn_prop_target)
+        rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
+        rnn_rmse = torch.sqrt(self.prop_criterion(denormalsied_output, curr_rnn_prop_target))
         # print(output)
         # print(loss)
+
+        prop_estimator_output = {
+            "rnn_loss": rnn_loss, 
+            "rnn_rmse": rnn_rmse, 
+            "normalized_output": normalized_output, 
+            "denormalsied_output": denormalsied_output,
+        }
 
         # with torch.no_grad():
         #     for batch_idx, (inputs, targets) in enumerate(test_loader):
@@ -324,7 +374,7 @@ class PPO_RNN_PROP(Agent):
         if self._rnn:
             self._rnn_final_states["policy"] = outputs.get("rnn", [])
 
-        return actions, log_prob, outputs, rnn_loss
+        return actions, log_prob, outputs, prop_estimator_output
 
     def record_transition(self,
                           states: torch.Tensor,
