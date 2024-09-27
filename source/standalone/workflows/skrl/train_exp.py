@@ -127,6 +127,8 @@ def main():
     # set seed for the experiment (override from command line)
     set_seed(args_cli_seed if args_cli_seed is not None else experiment_cfg["seed"])
 
+    experiment_cfg["models"]["policy"]["num_envs"] = env.num_envs
+
     # instantiate models using skrl model instantiator utility
     # https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
     models = {}

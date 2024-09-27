@@ -252,9 +252,12 @@ class PPO_RNN_PROP(Agent):
         self._rnn_final_states = {"policy": [], "value": []}
         self._rnn_initial_states = {"policy": [], "value": []}
         self._rnn_sequence_length = self.policy.get_specification().get("rnn", {}).get("sequence_length", 1)
-
+    
         # policy
         for i, size in enumerate(self.policy.get_specification().get("rnn", {}).get("sizes", [])):
+            print("Poloicyyads")
+            import sys
+            sys.exit(0)
             self._rnn = True
             # create tensors in memory
             if self.memory is not None:
@@ -383,6 +386,7 @@ class PPO_RNN_PROP(Agent):
         # print("act shapeeeee")
         # print(self._state_preprocessor(states).shape)
 
+        # print("Agent act called")
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 
@@ -598,6 +602,7 @@ class PPO_RNN_PROP(Agent):
 
                 # print("update shapeeeee")
                 # print(sampled_states.shape)
+                # print("Agent update called")
                 _, next_log_prob, _ = self.policy.act({"states": sampled_states, "taken_actions": sampled_actions, **rnn_policy}, role="policy")
 
                 # compute approximate KL divergence

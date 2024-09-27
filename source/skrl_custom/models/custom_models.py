@@ -15,7 +15,6 @@ from skrl.models.torch import CategoricalMixin, DeterministicMixin, GaussianMixi
 
 from skrl.utils.model_instantiators.torch.common import convert_deprecated_parameters, generate_containers
 
-
 def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
                    action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
                    device: Optional[Union[str, torch.device]] = None,
@@ -95,14 +94,16 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
     # RNN params
     rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
     rnn_num_layers = kwargs.get('rnn_num_layers', None)
+    rnn_num_envs = kwargs.get('num_envs', None)
     rnn_param = {
         "rnn_hidden_size": rnn_hidden_size, 
-        "rnn_num_layers": rnn_num_layers
+        "rnn_num_layers": rnn_num_layers, 
+        "rnn_num_envs": rnn_num_envs
     }
 
     template = f"""class GaussianModel(GaussianMixin, Model):
     def __init__(self, observation_space, action_space, device, clip_actions,
-                    clip_log_std, min_log_std, max_log_std, rnn_param, reduction="sum"):
+                    clip_log_std, min_log_std, max_log_std, rnn_param, sequence_length = 10, reduction="sum"):
         Model.__init__(self, observation_space, action_space, device)
         GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
 
@@ -110,27 +111,53 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
         print(observation_space.shape[0])
 
         # print(rnn_param)
+
+        self.sequence_length = sequence_length
+        self.rnn_num_envs = rnn_param["rnn_num_envs"]
+        self.rnn_num_layers = rnn_param["rnn_num_layers"]
+        self.rnn_hidden_size = rnn_param["rnn_hidden_size"]
+        print(self.sequence_length)
+        print(self.rnn_num_envs)
+        print(self.rnn_num_layers)
+        print(self.rnn_hidden_size)
+
+        # # Assuming rnn_param is defined somewhere in your code
+        # hidden_state = torch.zeros(rnn_param["rnn_num_layers"], batch_size, rnn_param["rnn_hidden_size"]).to(device)  # (num_layers, batch_size, hidden_size)
+        # cell_state = torch.zeros(rnn_param["rnn_num_layers"], batch_size, rnn_param["rnn_hidden_size"]).to(device)  # LSTM also needs cell state
         
         self.rnn = nn.LSTM(input_size={observation_space.shape[0]}, hidden_size=rnn_param["rnn_hidden_size"], num_layers=rnn_param["rnn_num_layers"], batch_first=True)
 
         {networks}
+
         self.log_std_parameter = nn.Parameter({initial_log_std} * torch.ones({output["size"]}))
 
     def compute(self, inputs, role=""):
 
-        rnn_input = inputs["states"]  # Extract the state from the dictionary
-        rnn_output, _ = self.rnn(rnn_input)  # Pass through the RNN
-        print("RNN outputttt")
-        print(rnn_output.shape)
-        
+        # rnn_input = inputs["states"]  # Extract the state from the dictionary
+        # rnn_input = rnn_input.view(-1, 1, rnn_input.shape[1])
+
+        # rnn_output, _ = self.rnn(rnn_input)  # Pass through the RNN
+
         # # Use the last output of RNN as input to the RL network
         # rnn_output = rnn_output[:, -1, :]  # Select the last time step
+        # # print("RNN outputttt")
+        # # print(rnn_output.shape)
 
-        # {forward.replace(container["input"], "rnn_output")}
+        # # {forward.replace(container["input"], "rnn_output")}
 
         {forward}
         return output, self.log_std_parameter, {{}}
+
+    def get_specification(self):
+        return {{"rnn": {{"sequence_length": self.sequence_length,
+                        "sizes": [(self.rnn_num_layers, self.rnn_num_envs, self.rnn_hidden_size),
+                                  (self.rnn_num_layers, self.rnn_num_envs, self.rnn_hidden_size)]}}}}
+    
+    # def print_hello(self, inputs, role=""):
+
+    #     print("hello")    
     """
+    
     # return source
     if return_source:
         return template
@@ -227,6 +254,11 @@ def custom_gaussian_model2(observation_space: Optional[Union[int, Tuple[int], gy
 
         {networks}
         self.log_std_parameter = nn.Parameter({initial_log_std} * torch.ones({output["size"]}))
+
+    # def get_specification(self):
+    #     print("hello")
+
+    #     return {{'rnn': {{'sizes': [(1, 4, 64), (1, 4, 64)]}}}}
 
     def compute(self, inputs, role=""):
         {forward}
