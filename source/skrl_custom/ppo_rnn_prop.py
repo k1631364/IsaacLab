@@ -379,6 +379,10 @@ class PPO_RNN_PROP(Agent):
         # print(self._state_preprocessor)
         # print(self._state_preprocessor(states)[0,0])
         # print(states[0,0]) 
+
+        # print("act shapeeeee")
+        # print(self._state_preprocessor(states).shape)
+
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 
@@ -592,6 +596,8 @@ class PPO_RNN_PROP(Agent):
 
                 sampled_states = self._state_preprocessor(sampled_states, train=not epoch)
 
+                # print("update shapeeeee")
+                # print(sampled_states.shape)
                 _, next_log_prob, _ = self.policy.act({"states": sampled_states, "taken_actions": sampled_actions, **rnn_policy}, role="policy")
 
                 # compute approximate KL divergence
