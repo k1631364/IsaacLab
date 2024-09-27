@@ -65,6 +65,9 @@ class DirectRLEnvFeedback(DirectRLEnv):
     }
     """Metadata for the environment."""
 
+    # def get_rnn_output(self, rnn_porp): 
+    #     print("hello")
+
     def __init__(self, cfg: DirectRLEnvCfg, render_mode: str | None = None, **kwargs):
         """Initialize the environment.
 
@@ -578,7 +581,12 @@ class DirectRLEnvFeedback(DirectRLEnv):
         set their visibility into the stage.
         """
         raise NotImplementedError(f"Debug visualization is not implemented for {self.__class__.__name__}.")
-
+    
+    @abstractmethod
+    def _get_rnn_output(self, rnn_output: dict):
+        # return NotImplementedError
+        pass
+    
     @abstractmethod
     def _pre_physics_step(self, actions: torch.Tensor):
         return NotImplementedError

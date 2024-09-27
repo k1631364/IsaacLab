@@ -235,7 +235,8 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
             # if "log" in infos:
             #     infos["log"]["rnn_loss"] = rnn_loss
             infos["log"]["rnn_loss"] = prop_estimator_output["rnn_loss"]
-            # infos["log"]["rnn_rmse"] = prop_estimator_output["rnn_rmse"]
+            infos["log"]["rnn_rmse"] = prop_estimator_output["rnn_rmse"]
+            # print(infos["log"]["rnn_rmse"] )
             if "log" in infos:
                 for k, v in infos["log"].items():
                     if isinstance(v, torch.Tensor) and v.numel() == 1:
@@ -280,6 +281,16 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
                     agent.act(states[scope[0] : scope[1]], timestep=timestep, timesteps=self.timesteps)[0]
                     for agent, scope in zip(self.agents, self.agents_scope)
                 ])
+
+            # # New implementation for action and prop_estimator_output in eval
+            # with torch.no_grad():
+            #     results = [
+            #         agent.act(states[scope[0]:scope[1]], timestep=timestep, timesteps=self.timesteps)
+            #         for agent, scope in zip(self.agents, self.agents_scope)
+            #     ]
+            #     actions = torch.vstack([result[0] for result in results])
+            #     prop_estimator_outputs = [result[3] for result in results]  # Assuming `prop_estimator_output` is the 4th element
+            #     print(prop_estimator_outputs)
 
             # step the environments
             next_states, rewards, terminated, truncated, infos = self.env.step(actions)

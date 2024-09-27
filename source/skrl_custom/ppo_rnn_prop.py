@@ -186,7 +186,7 @@ class PPO_RNN_PROP(Agent):
         else:
             self._value_preprocessor = self._empty_preprocessor
         
-        print("Running ppo rnn proppppppp")
+        # print("Running ppo rnn proppppppp")
         # print(self.cfg["prop_estimator"]["input_size"])
         
         input_size = self.cfg["prop_estimator"]["input_size"]  # State and action concatenated size
@@ -211,8 +211,8 @@ class PPO_RNN_PROP(Agent):
         self.estimate_target_min = self.cfg["prop_estimator"]["estimate_target_min"]   
         self.estimate_target_max = self.cfg["prop_estimator"]["estimate_target_max"]    
 
-        print(input_size)
-        print(learning_rate)
+        # print(input_size)
+        # print(learning_rate)
 
         self.prop_model = rnnmodel.RNN(input_size, hidden_size, num_layers, output_size).to(self.device)
         self.prop_criterion = nn.MSELoss()
@@ -296,6 +296,9 @@ class PPO_RNN_PROP(Agent):
         """
 
         curr_rnn_prop_input = infos["rnn_input"]
+        # print("Current input")
+        # print(curr_rnn_prop_input)
+
         normalized_curr_rnn_prop_input = curr_rnn_prop_input.clone()
 
         position = curr_rnn_prop_input[:, :, self.position_index]
@@ -328,17 +331,25 @@ class PPO_RNN_PROP(Agent):
         normalized_output = self.prop_model(normalized_curr_rnn_prop_input)
 
         denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+        denormalsied_target = denormalize(normalized_curr_rnn_prop_target, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
 
         rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
         rnn_rmse = torch.sqrt(self.prop_criterion(denormalsied_output, curr_rnn_prop_target))
         # print(output)
         # print(loss)
 
+        # print("Estimation loss")
+        # print(denormalsied_target)
+        # print("Denormalised output")
+        # print(denormalsied_output)
+        # print(rnn_rmse)
+
         prop_estimator_output = {
             "rnn_loss": rnn_loss, 
             "rnn_rmse": rnn_rmse, 
             "normalized_output": normalized_output, 
             "denormalsied_output": denormalsied_output,
+            "denormalsied_target": denormalsied_target
         }
 
         # with torch.no_grad():
