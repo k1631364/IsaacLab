@@ -243,6 +243,11 @@ class PPO_RNN_PROP(Agent):
             self.memory.create_tensor(name="returns", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="advantages", size=1, dtype=torch.float32)
 
+            # print("RNn param received in agent")
+            # print(self.policy.get_rnn_param())
+            # self.rnn_param = self.policy.get_rnn_param()
+            # self.memory.create_tensor(name="state_hist", size=(self.rnn_param["rnn_num_envs"], self.rnn_param["rnn_sequence_length"], self.observation_space.shape[0]), dtype=torch.float32)
+
             # tensors sampled during training
             self._tensors_names = ["states", "actions", "terminated", "log_prob", "values", "returns", "advantages"]
 
@@ -252,12 +257,9 @@ class PPO_RNN_PROP(Agent):
         self._rnn_final_states = {"policy": [], "value": []}
         self._rnn_initial_states = {"policy": [], "value": []}
         self._rnn_sequence_length = self.policy.get_specification().get("rnn", {}).get("sequence_length", 1)
-    
+
         # policy
         for i, size in enumerate(self.policy.get_specification().get("rnn", {}).get("sizes", [])):
-            print("Poloicyyads")
-            import sys
-            sys.exit(0)
             self._rnn = True
             # create tensors in memory
             if self.memory is not None:
@@ -452,6 +454,14 @@ class PPO_RNN_PROP(Agent):
                     rnn_states.update({f"rnn_value_{i}": s.transpose(0, 1) for i, s in enumerate(self._rnn_initial_states["value"])})
 
             # storage transition in memory
+            # print("Check add sampleessss")
+            # print(states.shape)
+            # print(actions.shape)
+            # print(rnn_states.keys())
+            # print(rnn_states["rnn_policy_0"].shape)
+            # print(rnn_states["rnn_policy_1"].shape)
+            # print(rnn_states["rnn_value_0"].shape)
+            # print(rnn_states["rnn_value_1"].shape)
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                     terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
             for memory in self.secondary_memories:
@@ -573,11 +583,26 @@ class PPO_RNN_PROP(Agent):
         self.memory.set_tensor_by_name("advantages", advantages)
 
         # sample mini-batches from memory
+        # print("Check mini batches")
+        # print(self._mini_batches)
+        # print(self._rnn_sequence_length)
         sampled_batches = self.memory.sample_all(names=self._tensors_names, mini_batches=self._mini_batches, sequence_length=self._rnn_sequence_length)
+            # print("Check sample batch shape")
+            # # first mini-batch = sampled_batches[0]
+            # curr_mini_batch = sampled_batches[0]
+            # curr_mini_batch_states = curr_mini_batch[0]
+            # print(curr_mini_batch_states.shape)
+        # import sys
+        # sys.exit(0)
 
         rnn_policy, rnn_value = {}, {}
         if self._rnn:
+            # print("Mini batch rnn")
+            # print(self._mini_batches)
+            # print(self._rnn_sequence_length)
             sampled_rnn_batches = self.memory.sample_all(names=self._rnn_tensors_names, mini_batches=self._mini_batches, sequence_length=self._rnn_sequence_length)
+            # print("RNN bacthess")
+            # print(sampled_rnn_batches[0][0].shape)
 
         cumulative_policy_loss = 0
         cumulative_entropy_loss = 0
@@ -591,6 +616,7 @@ class PPO_RNN_PROP(Agent):
             for i, (sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages) in enumerate(sampled_batches):
 
                 if self._rnn:
+                    # print("RNN enableddd!!")
                     if self.policy is self.value:
                         rnn_policy = {"rnn": [s.transpose(0, 1) for s in sampled_rnn_batches[i]], "terminated": sampled_dones}
                         rnn_value = rnn_policy

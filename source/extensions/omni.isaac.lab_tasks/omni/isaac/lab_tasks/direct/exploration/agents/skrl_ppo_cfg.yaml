@@ -18,6 +18,7 @@ models:
     output_scale: 1.0
     rnn_hidden_size: 128
     rnn_num_layers: 1
+    rnn_sequence_length: 10
   value:  # see 'skrl.utils.model_instantiators.torch.deterministic_model' for parameter details
     clip_actions: False
     input_shape: "Shape.STATES"
@@ -28,6 +29,7 @@ models:
     output_scale: 1.0
     rnn_hidden_size: 128
     rnn_num_layers: 1
+    rnn_sequence_length: 10
 
 
 # PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
