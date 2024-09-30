@@ -56,7 +56,7 @@ from source.skrl_custom.ppo_rnn import PPO_RNN
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
-from source.skrl_custom.models.custom_models import custom_gaussian_model, custom_deterministic_model 
+from source.skrl_custom.models.custom_models import custom_gaussian_model, custom_gaussian_model2, custom_deterministic_model, custom_deterministic_model2, custom_deterministic_model3 
 
 from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
@@ -136,13 +136,13 @@ def main():
     models = {}
     # non-shared models
     if experiment_cfg["models"]["separate"]:
-        models["policy"] = gaussian_model(
+        models["policy"] = custom_gaussian_model2(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
             **process_skrl_cfg(experiment_cfg["models"]["policy"]),
         )
-        models["value"] = deterministic_model(
+        models["value"] = custom_deterministic_model3(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,

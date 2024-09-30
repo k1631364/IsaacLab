@@ -232,6 +232,24 @@ class PPO_RNN(Agent):
         self._current_log_prob = None
         self._current_next_states = None
 
+        # print("Check memory initialisationnnn")
+        # print(self.memory.get_tensor_names())
+        # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
+        # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
+        # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
+        # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
+        # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
+        # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
+        # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
+        # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
+        # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
+        # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
+        # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
+        # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
+
+        # import sys
+        # sys.exit(0)
+
     def act(self, states: torch.Tensor, infos: dict, timestep: int, timesteps: int) -> torch.Tensor:
         """Process the environment's states to make a decision (actions) using the main policy
 
@@ -322,6 +340,36 @@ class PPO_RNN(Agent):
                     rnn_states.update({f"rnn_value_{i}": s.transpose(0, 1) for i, s in enumerate(self._rnn_initial_states["value"])})
 
             # storage transition in memory
+            # print("Check memory initialisationnnn")
+            # print(self.memory.get_tensor_names())
+            # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
+            # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
+            # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
+            # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
+            # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
+            # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
+            # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
+            # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
+            # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
+            # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
+            # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
+            # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
+
+            # print("States Tensor Shape:", states.shape)
+            # print("actions Tensor Shape:", actions.shape)
+            # # print("advantages Tensor Shape:", advantages.shape)
+            # print("log_prob Tensor Shape:", self._current_log_prob.shape)
+            # # print("returns Tensor Shape:", returns.shape)
+            # print("rewards Tensor Shape:", rewards.shape)
+            # print("rnn_policy_0 Tensor Shape:", rnn_states["rnn_policy_0"].shape)
+            # print("rnn_policy_1 Tensor Shape:", rnn_states["rnn_policy_1"].shape)
+            # print("rnn_value_1 Tensor Shape:", rnn_states["rnn_value_1"].shape)
+            # print("rnn_value_0 Tensor Shape:", rnn_states["rnn_value_0"].shape)
+            # print("terminated Tensor Shape:", terminated.shape)
+            # print("values Tensor Shape:", values.shape)
+
+            # values = values.reshape(-1,1)
+
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                     terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
             for memory in self.secondary_memories:

@@ -89,6 +89,98 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
     :rtype: Model
     """
 
+    class GaussianModel(GaussianMixin, Model):
+        def __init__(self, observation_space, action_space, device, clip_actions,
+                        clip_log_std, min_log_std, max_log_std, metadata, reduction="sum"):
+            Model.__init__(self, observation_space, action_space, device)
+            GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
+
+            self.num_observations = observation_space.shape[0]
+            self.num_actions = action_space.shape[0]
+
+            hiddens = metadata["hiddens"]
+            hidden_activation = metadata["hidden_activation"]
+            output_activation = metadata["output_activation"]
+            
+            self.log_std_parameter = nn.Parameter(initial_log_std * torch.ones(self.num_actions))
+
+            self.test_nn = build_sequential_network(self.num_observations, hiddens, self.num_actions, hidden_activation, output_activation)
+
+        def compute(self, inputs, role=""):
+
+            states = inputs["states"]
+
+            output = self.test_nn(states)
+
+            return output, self.log_std_parameter, {}
+
+    metadata = {
+        "input_shape": kwargs.get('input_shape', None), 
+        "hiddens": kwargs.get('hiddens', None), 
+        "hidden_activation": kwargs.get('hidden_activation', None), 
+        "output_shape": kwargs.get('output_shape', None), 
+        "output_activation": kwargs.get('output_activation', None), 
+        "output_scale": kwargs.get('output_scale', None), 
+        "initial_log_std": kwargs.get('initial_log_std', None), 
+    }
+
+    return GaussianModel(observation_space=observation_space,
+                                    action_space=action_space,
+                                    device=device,
+                                    clip_actions=clip_actions,
+                                    clip_log_std=clip_log_std,
+                                    min_log_std=min_log_std,
+                                    max_log_std=max_log_std, 
+                                    metadata=metadata)
+
+
+
+def custom_gaussian_model2(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                   action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                   device: Optional[Union[str, torch.device]] = None,
+                   clip_actions: bool = False,
+                   clip_log_std: bool = True,
+                   min_log_std: float = -20,
+                   max_log_std: float = 2,
+                   initial_log_std: float = 0,
+                   network: Sequence[Mapping[str, Any]] = [],
+                   output: Union[str, Sequence[str]] = "",
+                   return_source: bool = False,
+                   *args,
+                   **kwargs) -> Union[Model, str]:
+    """Instantiate a Gaussian model
+
+    :param observation_space: Observation/state space or shape (default: None).
+                              If it is not None, the num_observations property will contain the size of that space
+    :type observation_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param action_space: Action space or shape (default: None).
+                         If it is not None, the num_actions property will contain the size of that space
+    :type action_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param device: Device on which a tensor/array is or will be allocated (default: ``None``).
+                   If None, the device will be either ``"cuda"`` if available or ``"cpu"``
+    :type device: str or torch.device, optional
+    :param clip_actions: Flag to indicate whether the actions should be clipped (default: False)
+    :type clip_actions: bool, optional
+    :param clip_log_std: Flag to indicate whether the log standard deviations should be clipped (default: True)
+    :type clip_log_std: bool, optional
+    :param min_log_std: Minimum value of the log standard deviation (default: -20)
+    :type min_log_std: float, optional
+    :param max_log_std: Maximum value of the log standard deviation (default: 2)
+    :type max_log_std: float, optional
+    :param initial_log_std: Initial value for the log standard deviation (default: 0)
+    :type initial_log_std: float, optional
+    :param network: Network definition (default: [])
+    :type network: list of dict, optional
+    :param output: Output expression (default: "")
+    :type output: list or str, optional
+    :param return_source: Whether to return the source string containing the model class used to
+                          instantiate the model rather than the model instance (default: False).
+    :type return_source: bool, optional
+
+    :return: Gaussian model instance or definition source
+    :rtype: Model
+    """
+
 
     rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
     rnn_num_layers = kwargs.get('rnn_num_layers', None)
@@ -158,10 +250,10 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
         # def get_rnn_param(self): 
         #     return self.rnn_param
         
-        # def get_specification(self):
-        #     return {"rnn": {"sequence_length": self.sequence_length,
-        #                     "sizes": [(self.num_layers, self.num_envs, self.hidden_size),
-        #                             (self.num_layers, self.num_envs, self.hidden_size)]}}
+        def get_specification(self):
+            return {"rnn": {"sequence_length": self.sequence_length,
+                            "sizes": [(self.num_layers, self.num_envs, self.hidden_size),
+                                    (self.num_layers, self.num_envs, self.hidden_size)]}}
 
         def compute(self, inputs, role=""):
 
@@ -171,36 +263,36 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
             # print(inputs.keys())
             # print(inputs["rnn"][0].shape)
 
-            states = inputs["states"]
-
-            output = self.test_nn(states)
-
             # states = inputs["states"]
-            # terminated = inputs.get("terminated", None)
-            # hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
 
-            # # print("State shape")
-            # # print(states.shape)
+            # output = self.test_nn(states)
 
-            # features_states = self.feature_extractor(states)
+            states = inputs["states"]
+            terminated = inputs.get("terminated", None)
+            hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
 
-            # # print("Feature state shapeee")
-            # # print(features_states.shape)
+            # print("State shape")
+            # print(states.shape)
 
-            # batch_size = self.num_envs  # Number of parallel environments
-            # features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
+            features_states = self.feature_extractor(states)
 
-            # # rnn_output, (self.hidden_states, self.cell_states) = self.lstm(features_states, (self.hidden_states, self.cell_states))
-            # rnn_output, rnn_states = self.lstm(features_states, (hidden_states, cell_states))
+            # print("Feature state shapeee")
+            # print(features_states.shape)
+
+            batch_size = self.num_envs  # Number of parallel environments
+            features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
+
+            # rnn_output, (self.hidden_states, self.cell_states) = self.lstm(features_states, (self.hidden_states, self.cell_states))
+            rnn_output, rnn_states = self.lstm(features_states, (hidden_states, cell_states))
     
-            # output = self.post_lstm(rnn_output)
-            # output = torch.squeeze(output)
+            output = self.post_lstm(rnn_output)
+            output = torch.squeeze(output)
 
-            # # print("Check policy output size")
-            # # print(output.shape)
-            # # print(rnn_states[0].shape)
+            # print("Check policy output size")
+            # print(output.shape)
+            # print(rnn_states[0].shape)
 
-            # return output, self.log_std_parameter, {"rnn": [rnn_states[0], rnn_states[1]]}
+            return output, self.log_std_parameter, {"rnn": [rnn_states[0], rnn_states[1]]}
 
             # print("Feature state shapee")
             # print(features_states.shape)
@@ -329,7 +421,223 @@ def custom_gaussian_model(observation_space: Optional[Union[int, Tuple[int], gym
 
 
 
+
 def custom_deterministic_model(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                        action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                        device: Optional[Union[str, torch.device]] = None,
+                        clip_actions: bool = False,
+                        network: Sequence[Mapping[str, Any]] = [],
+                        output: Union[str, Sequence[str]] = "",
+                        return_source: bool = False,
+                        *args,
+                        **kwargs) -> Union[Model, str]:
+    """Instantiate a deterministic model
+
+    :param observation_space: Observation/state space or shape (default: None).
+                              If it is not None, the num_observations property will contain the size of that space
+    :type observation_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param action_space: Action space or shape (default: None).
+                         If it is not None, the num_actions property will contain the size of that space
+    :type action_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param device: Device on which a tensor/array is or will be allocated (default: ``None``).
+                   If None, the device will be either ``"cuda"`` if available or ``"cpu"``
+    :type device: str or torch.device, optional
+    :param clip_actions: Flag to indicate whether the actions should be clipped (default: False)
+    :type clip_actions: bool, optional
+    :param network: Network definition (default: [])
+    :type network: list of dict, optional
+    :param output: Output expression (default: "")
+    :type output: list or str, optional
+    :param return_source: Whether to return the source string containing the model class used to
+                          instantiate the model rather than the model instance (default: False).
+    :type return_source: bool, optional
+
+    :return: Deterministic model instance or definition source
+    :rtype: Model
+    """
+    # compatibility with versions prior to 1.3.0
+    if not network and kwargs:
+        network, output = convert_deprecated_parameters(kwargs)
+
+    # parse model definition
+    containers, output = generate_containers(network, output, embed_output=True, indent=1)
+
+    # network definitions
+    networks = []
+    forward: list[str] = []
+    for container in containers:
+        networks.append(f'self.{container["name"]}_container = {container["sequential"]}')
+        forward.append(f'{container["name"]} = self.{container["name"]}_container({container["input"]})')
+    # process output
+    if output["modules"]:
+        networks.append(f'self.output_layer = {output["modules"][0]}')
+        forward.append(f'output = self.output_layer({container["name"]})')
+    if output["output"]:
+        forward.append(f'output = {output["output"]}')
+    else:
+        forward[-1] = forward[-1].replace(f'{container["name"]} =', "output =", 1)
+
+    # build substitutions and indent content
+    networks = textwrap.indent("\n".join(networks), prefix=" " * 8)[8:]
+    forward = textwrap.indent("\n".join(forward), prefix=" " * 8)[8:]
+
+    template = f"""class DeterministicModel(DeterministicMixin, Model):
+    def __init__(self, observation_space, action_space, device, clip_actions):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+
+        {networks}
+
+    def compute(self, inputs, role=""):
+        {forward}
+        print("Output shapeeeeee")
+        print(output.shape)
+        return output, {{}}
+    """
+    # return source
+    if return_source:
+        return template
+
+    # instantiate model
+    _locals = {}
+    exec(template, globals(), _locals)
+    return _locals["DeterministicModel"](observation_space=observation_space,
+                                         action_space=action_space,
+                                         device=device,
+                                         clip_actions=clip_actions)
+
+
+
+
+def custom_deterministic_model2(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                        action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                        device: Optional[Union[str, torch.device]] = None,
+                        clip_actions: bool = False,
+                        network: Sequence[Mapping[str, Any]] = [],
+                        output: Union[str, Sequence[str]] = "",
+                        return_source: bool = False,
+                        *args,
+                        **kwargs) -> Union[Model, str]:
+    """Instantiate a deterministic model
+
+    :param observation_space: Observation/state space or shape (default: None).
+                              If it is not None, the num_observations property will contain the size of that space
+    :type observation_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param action_space: Action space or shape (default: None).
+                         If it is not None, the num_actions property will contain the size of that space
+    :type action_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+    :param device: Device on which a tensor/array is or will be allocated (default: ``None``).
+                   If None, the device will be either ``"cuda"`` if available or ``"cpu"``
+    :type device: str or torch.device, optional
+    :param clip_actions: Flag to indicate whether the actions should be clipped (default: False)
+    :type clip_actions: bool, optional
+    :param network: Network definition (default: [])
+    :type network: list of dict, optional
+    :param output: Output expression (default: "")
+    :type output: list or str, optional
+    :param return_source: Whether to return the source string containing the model class used to
+                          instantiate the model rather than the model instance (default: False).
+    :type return_source: bool, optional
+
+    :return: Deterministic model instance or definition source
+    :rtype: Model
+    """
+    # # compatibility with versions prior to 1.3.0
+    # if not network and kwargs:
+    #     network, output = convert_deprecated_parameters(kwargs)
+
+    # # parse model definition
+    # containers, output = generate_containers(network, output, embed_output=True, indent=1)
+
+    # # network definitions
+    # networks = []
+    # forward: list[str] = []
+    # for container in containers:
+    #     networks.append(f'self.{container["name"]}_container = {container["sequential"]}')
+    #     forward.append(f'{container["name"]} = self.{container["name"]}_container({container["input"]})')
+    # # process output
+    # if output["modules"]:
+    #     networks.append(f'self.output_layer = {output["modules"][0]}')
+    #     forward.append(f'output = self.output_layer({container["name"]})')
+    # if output["output"]:
+    #     forward.append(f'output = {output["output"]}')
+    # else:
+    #     forward[-1] = forward[-1].replace(f'{container["name"]} =', "output =", 1)
+
+    # # build substitutions and indent content
+    # networks = textwrap.indent("\n".join(networks), prefix=" " * 8)[8:]
+    # forward = textwrap.indent("\n".join(forward), prefix=" " * 8)[8:]
+
+    class DeterministicModel(DeterministicMixin, Model):
+        def __init__(self, observation_space, action_space, device, clip_actions, metadata):
+            Model.__init__(self, observation_space, action_space, device)
+            DeterministicMixin.__init__(self, clip_actions)
+
+            self.num_observations = observation_space.shape[0]
+            self.num_actions = action_space.shape[0]
+
+            hiddens = metadata["hiddens"]
+            hidden_activation = metadata["hidden_activation"]
+            output_activation = metadata["output_activation"]     
+            output_shape = metadata["output_shape"].value     
+
+            self.test_nn = build_sequential_network(self.num_observations, hiddens, output_shape, hidden_activation, output_activation)
+
+        def compute(self, inputs, role=""):
+
+            states = inputs["states"]
+
+            output = self.test_nn(states)
+
+            print("Outpus shapee??")
+            print(output.shape)
+
+            return output, {}
+
+    # template = f"""class DeterministicModel(DeterministicMixin, Model):
+    # def __init__(self, observation_space, action_space, device, clip_actions):
+    #     Model.__init__(self, observation_space, action_space, device)
+    #     DeterministicMixin.__init__(self, clip_actions)
+
+    #     {networks}
+
+    # def compute(self, inputs, role=""):
+    #     {forward}
+    #     return output, {{}}
+    # """
+
+
+    # # return source
+    # if return_source:
+    #     return template
+
+    # # instantiate model
+    # _locals = {}
+    # exec(template, globals(), _locals)
+    # return _locals["DeterministicModel"](observation_space=observation_space,
+    #                                      action_space=action_space,
+    #                                      device=device,
+    #                                      clip_actions=clip_actions)
+
+    metadata = {
+        "input_shape": kwargs.get('input_shape', None), 
+        "hiddens": kwargs.get('hiddens', None), 
+        "hidden_activation": kwargs.get('hidden_activation', None), 
+        "output_shape": kwargs.get('output_shape', None), 
+        "output_activation": kwargs.get('output_activation', None), 
+        "output_scale": kwargs.get('output_scale', None), 
+    }
+
+    return DeterministicModel(observation_space=observation_space,
+                                         action_space=action_space,
+                                         device=device,
+                                         clip_actions=clip_actions, 
+                                         metadata=metadata)
+
+
+
+
+def custom_deterministic_model3(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
                         action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
                         device: Optional[Union[str, torch.device]] = None,
                         clip_actions: bool = False,
@@ -428,8 +736,9 @@ def custom_deterministic_model(observation_space: Optional[Union[int, Tuple[int]
             hiddens = metadata["hiddens"]
             hidden_activation = metadata["hidden_activation"]
             output_activation = metadata["output_activation"]
+            output_shape = metadata["output_shape"].value
 
-            self.test_nn = build_sequential_network(self.num_observations, hiddens, self.num_actions, hidden_activation, output_activation)
+            self.test_nn = build_sequential_network(self.num_observations, hiddens, output_shape, hidden_activation, output_activation)
 
             self.feature_extractor = nn.Sequential(nn.Linear(self.num_observations, self.feature_extractor_size),
                                                 nn.Tanh())
@@ -441,10 +750,10 @@ def custom_deterministic_model(observation_space: Optional[Union[int, Tuple[int]
 
             self.post_lstm = nn.Sequential(nn.Linear(self.hidden_size, 128),
                                     nn.Tanh(),
-                                    nn.Linear(128, self.num_actions))
+                                    nn.Linear(128, output_shape))
 
             self.mlp_nn = nn.Sequential(nn.Linear(self.num_observations, 128, ),
-                                                nn.Linear(128, self.num_actions))
+                                                nn.Linear(128, output_shape))
 
         def get_specification(self):
             return {"rnn": {"sequence_length": self.sequence_length,
@@ -453,38 +762,46 @@ def custom_deterministic_model(observation_space: Optional[Union[int, Tuple[int]
         
         def compute(self, inputs, role=""):
 
-            states = inputs["states"]
-
-            output = self.test_nn(states)
-
-            return output, {}
-
             # states = inputs["states"]
-            # terminated = inputs.get("terminated", None)
-            # hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
 
-            # # print("State shape")
-            # # print(states.shape)
+            # output = self.test_nn(states)
 
-            # features_states = self.feature_extractor(states)
+            # return output, {}
 
-            # # print("Feature state shapeee")
-            # # print(features_states.shape)
+            states = inputs["states"]
+            terminated = inputs.get("terminated", None)
+            hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
 
-            # batch_size = self.num_envs  # Number of parallel environments
-            # features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
+            # print("State shape")
+            # print(states.shape)
 
-            # # rnn_output, (self.hidden_states, self.cell_states) = self.lstm(features_states, (self.hidden_states, self.cell_states))
-            # rnn_output, rnn_states = self.lstm(features_states, (hidden_states, cell_states))
+            features_states = self.feature_extractor(states)
+
+            # print("Feature state shapeee")
+            # print(features_states.shape)
+
+            batch_size = self.num_envs  # Number of parallel environments
+            features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
+
+            # rnn_output, (self.hidden_states, self.cell_states) = self.lstm(features_states, (self.hidden_states, self.cell_states))
+            rnn_output, rnn_states = self.lstm(features_states, (hidden_states, cell_states))
+
+            # print("RNN shape")
+            # print(rnn_output.shape)
+
+            rnn_output = torch.squeeze(rnn_output)
     
-            # output = self.post_lstm(rnn_output)
+            output = self.post_lstm(rnn_output)
             # output = torch.squeeze(output)
 
-            # # print("Check value output size")
-            # # print(output.shape)
-            # # print(rnn_states[0].shape)
+            # print("Check value output size")
+            # print(output.shape)
+            # print(rnn_states[0].shape)
+            
+            # print("Output shapeeee")
+            # print(output.shape)
 
-            # return output, {"rnn": [rnn_states[0], rnn_states[1]]}
+            return output, {"rnn": [rnn_states[0], rnn_states[1]]}
 
     metadata = {
         "input_shape": kwargs.get('input_shape', None), 
