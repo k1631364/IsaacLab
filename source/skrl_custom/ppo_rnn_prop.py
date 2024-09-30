@@ -18,6 +18,8 @@ from skrl.resources.schedulers.torch import KLAdaptiveLR
 import source.nn_models.RNN as rnnmodel
 import torch.optim as optim
 
+import matplotlib.pyplot as plt
+import matplotlib
 
 def normalize(tensor, min_val, max_val, new_min, new_max):
     return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
@@ -613,7 +615,15 @@ class PPO_RNN_PROP(Agent):
             kl_divergences = []
 
             # mini-batches loop
+            # test_sample = sampled_batches[i][0]
+            # print(test_sample.shape)
             for i, (sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages) in enumerate(sampled_batches):
+                # print("Sampled states")
+                # print(sampled_states.shape)
+                # print(i)
+
+                import numpy as np
+                xpoints = np.arange(0, self._mini_batches) 
 
                 if self._rnn:
                     # print("RNN enableddd!!")

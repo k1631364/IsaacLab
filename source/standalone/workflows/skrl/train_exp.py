@@ -52,10 +52,11 @@ from datetime import datetime
 
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG #,PPO_RNN
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
+from source.skrl_custom.ppo_rnn import PPO_RNN
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
-from source.skrl_custom.models.custom_models import custom_gaussian_model, custom_gaussian_model2, custom_deterministic_model, custom_deterministic_model2, custom_gaussian_model4
+from source.skrl_custom.models.custom_models import custom_gaussian_model, custom_deterministic_model 
 
 from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
@@ -135,13 +136,13 @@ def main():
     models = {}
     # non-shared models
     if experiment_cfg["models"]["separate"]:
-        models["policy"] = custom_gaussian_model4(
+        models["policy"] = gaussian_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
             **process_skrl_cfg(experiment_cfg["models"]["policy"]),
         )
-        models["value"] = custom_deterministic_model(
+        models["value"] = deterministic_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
@@ -180,7 +181,7 @@ def main():
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
 
-    agent = PPO_RNN_PROP(
+    agent = PPO_RNN(
         models=models,
         memory=memory,
         cfg=agent_cfg,

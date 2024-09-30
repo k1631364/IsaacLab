@@ -428,8 +428,8 @@ class PPO_RNN(Agent):
         last_values = self._value_preprocessor(last_values, inverse=True)
 
         values = self.memory.get_tensor_by_name("values")
-        print("Memoryyyyy")
-        print(self.memory.get_tensor_by_name("rewards").shape)
+        # print("Memoryyyyy")
+        # print(self.memory.get_tensor_by_name("rewards").shape)
         returns, advantages = compute_gae(rewards=self.memory.get_tensor_by_name("rewards"),
                                           dones=self.memory.get_tensor_by_name("terminated"),
                                           values=values,
