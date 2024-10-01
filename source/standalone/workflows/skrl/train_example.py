@@ -180,7 +180,7 @@ def main():
     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
-    agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
+    # agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
 
     agent = PPO(
         models=models,

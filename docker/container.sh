@@ -285,7 +285,7 @@ case $mode in
         # We have to build the base image as a separate step,
         # in case we are building a profile which depends
         # upon
-        export WANDB_API_KEY="68f7e48d01c3115c1c7aab0fa39541a7ab47d0a0"
+        export WANDB_API_KEY="${WANDB_API_KEY:-None}"
         docker compose --file docker-compose.yaml --env-file .env.base build isaac-lab-base
         docker compose $add_yamls $add_profiles $add_envs up --detach --build --remove-orphans
 
