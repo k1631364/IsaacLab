@@ -64,7 +64,7 @@ agent:
     experiment_name: ""
     write_interval: 120
     checkpoint_interval: 120
-    wandb: False,             # whether to use Weights & Biases
+    wandb: False             # whether to use Weights & Biases
     wandb_kwargs:
       project: "isaac-sim-slidingtest"
       name: "" # wandb kwargs (see https://docs.wandb.ai/ref/python/init)
