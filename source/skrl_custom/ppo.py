@@ -65,7 +65,7 @@ PPO_DEFAULT_CONFIG = {
 # [end-config-dict-torch]
 
 
-class PPO_RNN(Agent):
+class PPO(Agent):
     def __init__(self,
                  models: Mapping[str, Model],
                  memory: Optional[Union[Memory, Tuple[Memory]]] = None,
@@ -95,7 +95,6 @@ class PPO_RNN(Agent):
 
         :raises KeyError: If the models dictionary is missing a required key
         """
-
         _cfg = copy.deepcopy(PPO_DEFAULT_CONFIG)
         _cfg.update(cfg if cfg is not None else {})
         super().__init__(models=models,
@@ -232,24 +231,6 @@ class PPO_RNN(Agent):
         self._current_log_prob = None
         self._current_next_states = None
 
-        # print("Check memory initialisationnnn")
-        # print(self.memory.get_tensor_names())
-        # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
-        # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
-        # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
-        # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
-        # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
-        # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
-        # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
-        # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
-        # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
-        # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
-        # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
-        # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
-
-        # import sys
-        # sys.exit(0)
-
     def act(self, states: torch.Tensor, timestep: int, timesteps: int) -> torch.Tensor:
         """Process the environment's states to make a decision (actions) using the main policy
 
@@ -271,10 +252,6 @@ class PPO_RNN(Agent):
             return self.policy.random_act({"states": self._state_preprocessor(states), **rnn}, role="policy")
 
         # sample stochastic actions
-        # print("State processorrrrrr")
-        # print(self._state_preprocessor)
-        # print(self._state_preprocessor(states)[0,0])
-        # print(states[0,0]) 
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 
@@ -340,36 +317,6 @@ class PPO_RNN(Agent):
                     rnn_states.update({f"rnn_value_{i}": s.transpose(0, 1) for i, s in enumerate(self._rnn_initial_states["value"])})
 
             # storage transition in memory
-            # print("Check memory initialisationnnn")
-            # print(self.memory.get_tensor_names())
-            # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
-            # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
-            # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
-            # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
-            # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
-            # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
-            # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
-            # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
-            # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
-            # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
-            # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
-            # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
-
-            # print("States Tensor Shape:", states.shape)
-            # print("actions Tensor Shape:", actions.shape)
-            # # print("advantages Tensor Shape:", advantages.shape)
-            # print("log_prob Tensor Shape:", self._current_log_prob.shape)
-            # # print("returns Tensor Shape:", returns.shape)
-            # print("rewards Tensor Shape:", rewards.shape)
-            # print("rnn_policy_0 Tensor Shape:", rnn_states["rnn_policy_0"].shape)
-            # print("rnn_policy_1 Tensor Shape:", rnn_states["rnn_policy_1"].shape)
-            # print("rnn_value_1 Tensor Shape:", rnn_states["rnn_value_1"].shape)
-            # print("rnn_value_0 Tensor Shape:", rnn_states["rnn_value_0"].shape)
-            # print("terminated Tensor Shape:", terminated.shape)
-            # print("values Tensor Shape:", values.shape)
-
-            # values = values.reshape(-1,1)
-
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                     terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
             for memory in self.secondary_memories:
@@ -476,8 +423,6 @@ class PPO_RNN(Agent):
         last_values = self._value_preprocessor(last_values, inverse=True)
 
         values = self.memory.get_tensor_by_name("values")
-        # print("Memoryyyyy")
-        # print(self.memory.get_tensor_by_name("rewards").shape)
         returns, advantages = compute_gae(rewards=self.memory.get_tensor_by_name("rewards"),
                                           dones=self.memory.get_tensor_by_name("terminated"),
                                           values=values,

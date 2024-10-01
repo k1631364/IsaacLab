@@ -202,8 +202,8 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
                 # print(states.shape)
                 # print(infos.keys()) 
                 # print(infos["rnn_input"].shape)
-                actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
-                # actions, log_prob, outputs, prop_estimator_output = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
+                # actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
+                actions, log_prob, outputs, prop_estimator_output = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
 
             # print("RNN losssss")
             # print(rnn_loss)
@@ -234,8 +234,8 @@ class SkrlSequentialLogTrainer_RNN(Trainer):
             # print(infos)
             # if "log" in infos:
             #     infos["log"]["rnn_loss"] = rnn_loss
-            # infos["log"]["rnn_loss"] = prop_estimator_output["rnn_loss"]
-            # infos["log"]["rnn_rmse"] = prop_estimator_output["rnn_rmse"]
+            infos["log"]["rnn_loss"] = prop_estimator_output["rnn_loss"]
+            infos["log"]["rnn_rmse"] = prop_estimator_output["rnn_rmse"]
             # print(infos["log"]["rnn_rmse"] )
             if "log" in infos:
                 for k, v in infos["log"].items():

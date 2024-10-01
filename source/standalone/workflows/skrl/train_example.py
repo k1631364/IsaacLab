@@ -53,6 +53,7 @@ from datetime import datetime
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG #,PPO_RNN
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
 from source.skrl_custom.ppo_rnn import PPO_RNN
+from source.skrl_custom.ppo import PPO
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -64,7 +65,6 @@ from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
-from omni.isaac.lab_tasks.utils.wrappers.skrl_rnn import SkrlSequentialLogTrainer_RNN #, SkrlVecEnvWrapper, process_skrl_cfg
 
 
 # from source.offline_learning.model import RNNPropertyEstimator 
@@ -136,13 +136,13 @@ def main():
     models = {}
     # non-shared models
     if experiment_cfg["models"]["separate"]:
-        models["policy"] = custom_gaussian_model(
+        models["policy"] = gaussian_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
             **process_skrl_cfg(experiment_cfg["models"]["policy"]),
         )
-        models["value"] = custom_deterministic_model(
+        models["value"] = deterministic_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
@@ -181,14 +181,13 @@ def main():
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
 
-    agent = PPO_RNN(
+    agent = PPO(
         models=models,
         memory=memory,
         cfg=agent_cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,
         device=env.device,
-        # memory_all=memory_all, 
     )
 
     # configure and instantiate a custom RL trainer for logging episode events
