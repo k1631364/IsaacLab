@@ -179,7 +179,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
     episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 11
+    num_observations = 12
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -292,42 +292,42 @@ class ExplorationEnv(DirectRLEnvFeedback):
 
         self.curriculum_count = 0
 
-        ### Prop estimation (offline) ###
+        # ### Prop estimation (offline) ###
 
-        # Load the learnt model info
-        prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-09-13_13-27-32/model/model_params_dict.pkl"
-        with open(prop_estimator_dict_path, "rb") as fp: 
-            self.prop_estimator_dict = pickle.load(fp)
-        print(self.prop_estimator_dict)
+        # # Load the learnt model info
+        # prop_estimator_dict_path = "/workspace/isaaclab/logs/prop_estimation/offline_prop_estimation/2024-09-13_13-27-32/model/model_params_dict.pkl"
+        # with open(prop_estimator_dict_path, "rb") as fp: 
+        #     self.prop_estimator_dict = pickle.load(fp)
+        # print(self.prop_estimator_dict)
 
-        rnn_input_size = self.prop_estimator_dict["input_size"]
-        rnn_hidden_size = self.prop_estimator_dict["hidden_size"]
-        rnn_num_layers = self.prop_estimator_dict["num_layers"]
-        rnn_output_size = self.prop_estimator_dict["output_size"]
+        # rnn_input_size = self.prop_estimator_dict["input_size"]
+        # rnn_hidden_size = self.prop_estimator_dict["hidden_size"]
+        # rnn_num_layers = self.prop_estimator_dict["num_layers"]
+        # rnn_output_size = self.prop_estimator_dict["output_size"]
 
-        self.rnn_prop_model = rnnmodel.RNNPropertyEstimator(rnn_input_size, rnn_hidden_size, rnn_num_layers, rnn_output_size).to(self.scene.env_origins.device)
+        # self.rnn_prop_model = rnnmodel.RNNPropertyEstimator(rnn_input_size, rnn_hidden_size, rnn_num_layers, rnn_output_size).to(self.scene.env_origins.device)
 
-        # Load the learnt model
-        self.rnn_prop_model.load_state_dict(torch.load(self.prop_estimator_dict["model_path"], map_location=torch.device(self.scene.env_origins.device)))
-        self.rnn_prop_model.eval()
+        # # Load the learnt model
+        # self.rnn_prop_model.load_state_dict(torch.load(self.prop_estimator_dict["model_path"], map_location=torch.device(self.scene.env_origins.device)))
+        # self.rnn_prop_model.eval()
 
-        self.pos_min = self.prop_estimator_dict["pos_min"] 
-        self.pos_max = self.prop_estimator_dict["pos_max"] 
-        self.rot_min = self.prop_estimator_dict["rot_min"] 
-        self.rot_max = self.prop_estimator_dict["rot_max"] 
-        self.vel_min = self.prop_estimator_dict["vel_min"] 
-        self.vel_max = self.prop_estimator_dict["vel_max"] 
-        self.feature_target_min = self.prop_estimator_dict["feature_target_min"] 
-        self.feature_target_max = self.prop_estimator_dict["feature_target_max"]
+        # self.pos_min = self.prop_estimator_dict["pos_min"] 
+        # self.pos_max = self.prop_estimator_dict["pos_max"] 
+        # self.rot_min = self.prop_estimator_dict["rot_min"] 
+        # self.rot_max = self.prop_estimator_dict["rot_max"] 
+        # self.vel_min = self.prop_estimator_dict["vel_min"] 
+        # self.vel_max = self.prop_estimator_dict["vel_max"] 
+        # self.feature_target_min = self.prop_estimator_dict["feature_target_min"] 
+        # self.feature_target_max = self.prop_estimator_dict["feature_target_max"]
 
-        self.fric_min = self.prop_estimator_dict["fric_min"] 
-        self.fric_max = self.prop_estimator_dict["fric_max"] 
-        self.com_min = self.prop_estimator_dict["com_min"] 
-        self.com_max = self.prop_estimator_dict["com_max"] 
-        self.action_target_min = self.prop_estimator_dict["action_target_min"] 
-        self.action_target_max = self.prop_estimator_dict["action_target_max"]
+        # self.fric_min = self.prop_estimator_dict["fric_min"] 
+        # self.fric_max = self.prop_estimator_dict["fric_max"] 
+        # self.com_min = self.prop_estimator_dict["com_min"] 
+        # self.com_max = self.prop_estimator_dict["com_max"] 
+        # self.action_target_min = self.prop_estimator_dict["action_target_min"] 
+        # self.action_target_max = self.prop_estimator_dict["action_target_max"]
 
-        ### Prop estimation (offline) End ###
+        # ### Prop estimation (offline) End ###
 
         # Episodic noises
         self.obs_pos_noise_epi = torch.normal(self.cfg.obs_pos_noise_mean, self.cfg.obs_pos_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
@@ -527,23 +527,23 @@ class ExplorationEnv(DirectRLEnvFeedback):
         self.past_obs_prop = self.past_obs_prop[-self.past_timestep_prop:]
         past_obs_prop_tensor = torch.cat(self.past_obs_prop, dim=0)
 
-        position_index = [0,1,3,4]
-        rotation_index = 2
+        # position_index = [0,1,3,4]
+        # rotation_index = 2
 
-        # online_rnn_prop_info = {
-        #     "position_index": position_index, 
-        #     "rotation_index": rotation_index, 
-        # }
+        # # online_rnn_prop_info = {
+        # #     "position_index": position_index, 
+        # #     "rotation_index": rotation_index, 
+        # # }
 
-        positions = past_obs_prop_tensor[:, :, position_index]
-        rotation = past_obs_prop_tensor[:, :, rotation_index]
+        # positions = past_obs_prop_tensor[:, :, position_index]
+        # rotation = past_obs_prop_tensor[:, :, rotation_index]
 
-        normalized_positions = normalize(positions, self.pos_min, self.pos_max, self.feature_target_min, self.feature_target_max)
-        normalized_rotation = normalize(rotation, self.rot_min, self.rot_max, self.feature_target_min, self.feature_target_max)
+        # normalized_positions = normalize(positions, self.pos_min, self.pos_max, self.feature_target_min, self.feature_target_max)
+        # normalized_rotation = normalize(rotation, self.rot_min, self.rot_max, self.feature_target_min, self.feature_target_max)
 
-        normalized_past_obs_prop = past_obs_prop_tensor.clone()
-        normalized_past_obs_prop[:, :, position_index] = normalized_positions
-        normalized_past_obs_prop[:, :, rotation_index] = normalized_rotation
+        # normalized_past_obs_prop = past_obs_prop_tensor.clone()
+        # normalized_past_obs_prop[:, :, position_index] = normalized_positions
+        # normalized_past_obs_prop[:, :, rotation_index] = normalized_rotation
 
         # print("Normaliseeee past obs prop")
         # print(normalized_past_obs_prop.shape)
@@ -551,10 +551,10 @@ class ExplorationEnv(DirectRLEnvFeedback):
 
         past_action_prop_tensor = torch.cat(self.past_action_prop, dim=0)
 
-        velocities = past_action_prop_tensor
-        normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
-        normalized_past_action_prop = past_action_prop_tensor.clone()
-        normalized_past_action_prop = normalized_velocities
+        # velocities = past_action_prop_tensor
+        # normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
+        # normalized_past_action_prop = past_action_prop_tensor.clone()
+        # normalized_past_action_prop = normalized_velocities
 
         # print("Normaliseeee past obs prop")
         # print(normalized_past_action_prop.shape)
@@ -571,8 +571,8 @@ class ExplorationEnv(DirectRLEnvFeedback):
         online_rnn_prop_input = torch.cat((past_obs_prop_tensor, past_action_prop_tensor), dim=2)
         online_rnn_prop_input = online_rnn_prop_input.swapaxes(0, 1)
 
-        rnn_prop_input = torch.cat((normalized_past_obs_prop, normalized_past_action_prop), dim=2)
-        rnn_prop_input = rnn_prop_input.swapaxes(0, 1)
+        # rnn_prop_input = torch.cat((normalized_past_obs_prop, normalized_past_action_prop), dim=2)
+        # rnn_prop_input = rnn_prop_input.swapaxes(0, 1)
 
         # Offline inference
         # self.rnn_prop_model.eval()
@@ -585,10 +585,10 @@ class ExplorationEnv(DirectRLEnvFeedback):
 
 
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), norma        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)lized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, denormalsied_estimated_prop), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_prop_rl), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)        
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)

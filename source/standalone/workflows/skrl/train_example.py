@@ -95,7 +95,7 @@ def main():
     experiment_cfg["agent"]["experiment"]["directory"] = log_root_path
     experiment_cfg["agent"]["experiment"]["experiment_name"] = log_dir
     # Uncomment to use custom run name
-    # experiment_cfg["agent"]["experiment"]["wandb_kwargs"]["name"] = log_dir
+    experiment_cfg["agent"]["experiment"]["wandb_kwargs"]["name"] = log_dir
     
     # update log_dir
     log_dir = os.path.join(log_root_path, log_dir)
