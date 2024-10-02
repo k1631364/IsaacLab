@@ -30,10 +30,19 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
+
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
+
+# always enable cameras to record video
+
+if args_cli.video:
+    args_cli.enable_cameras = True
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
@@ -62,7 +71,45 @@ def main():
     experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_cfg_entry_point")
 
     # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg)
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+
+    # specify directory for logging experiments (load checkpoint)
+    log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
+    log_root_path = os.path.abspath(log_root_path)
+    print(f"[INFO] Loading experiment from directory: {log_root_path}")
+    # get checkpoint path
+    if args_cli.checkpoint:
+        resume_path = os.path.abspath(args_cli.checkpoint)
+    else:
+        resume_path = get_checkpoint_path(log_root_path, other_dirs=["checkpoints"])
+    print(f"[INFO] Loading model checkpoint from: {resume_path}")
+    
+    print(log_root_path)
+    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if experiment_cfg["agent"]["experiment"]["experiment_name"]:
+        log_dir += f'_{experiment_cfg["agent"]["experiment"]["experiment_name"]}'
+
+    # print("Checkpoint path")
+    # print("Video log dir")
+    # print(log_dir)
+    # # logs
+    # import sys
+    # sys.exit(0)
+    # os.path.join("logs", "videos", log_dir, "videos", "train")
+
+    if args_cli.video:
+        video_kwargs = {
+            # "video_folder": os.path.join(log_dir, "videos", "train"),
+            "video_folder": os.path.join("logs", "videos", log_dir, "videos", "train"), 
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+
+        print("[INFO] Recording videos during play.")
+
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
     # wrap around environment for skrl
     env = SkrlVecEnvWrapper(env)  # same as: `wrap_env(env, wrapper="isaac-orbit")`
 
@@ -119,22 +166,6 @@ def main():
         action_space=env.action_space,
         device=env.device,
     )
-
-    # specify directory for logging experiments (load checkpoint)
-    log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
-    log_root_path = os.path.abspath(log_root_path)
-    print(f"[INFO] Loading experiment from directory: {log_root_path}")
-    # get checkpoint path
-    if args_cli.checkpoint:
-        resume_path = os.path.abspath(args_cli.checkpoint)
-    else:
-        resume_path = get_checkpoint_path(log_root_path, other_dirs=["checkpoints"])
-    print(f"[INFO] Loading model checkpoint from: {resume_path}")
-    
-    print(log_root_path)
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    if experiment_cfg["agent"]["experiment"]["experiment_name"]:
-        log_dir += f'_{experiment_cfg["agent"]["experiment"]["experiment_name"]}'
 
     # initialize agent
     agent.init()

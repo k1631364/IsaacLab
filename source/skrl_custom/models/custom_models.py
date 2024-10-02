@@ -451,132 +451,132 @@ def custom_gaussian_model_rnn(observation_space: Optional[Union[int, Tuple[int],
                                     rnn_param=rnn_param, 
                                     metadata=metadata)
 
-def custom_gaussian_model_rnn2(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
-                   action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
-                   device: Optional[Union[str, torch.device]] = None,
-                   clip_actions: bool = False,
-                   clip_log_std: bool = True,
-                   min_log_std: float = -20,
-                   max_log_std: float = 2,
-                   initial_log_std: float = 0,
-                   network: Sequence[Mapping[str, Any]] = [],
-                   output: Union[str, Sequence[str]] = "",
-                   return_source: bool = False,
-                   *args,
-                   **kwargs) -> Union[Model, str]:
-    """Instantiate a Gaussian model
+# def custom_gaussian_model_rnn2(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+#                    action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+#                    device: Optional[Union[str, torch.device]] = None,
+#                    clip_actions: bool = False,
+#                    clip_log_std: bool = True,
+#                    min_log_std: float = -20,
+#                    max_log_std: float = 2,
+#                    initial_log_std: float = 0,
+#                    network: Sequence[Mapping[str, Any]] = [],
+#                    output: Union[str, Sequence[str]] = "",
+#                    return_source: bool = False,
+#                    *args,
+#                    **kwargs) -> Union[Model, str]:
+#     """Instantiate a Gaussian model
 
-    :param observation_space: Observation/state space or shape (default: None).
-                              If it is not None, the num_observations property will contain the size of that space
-    :type observation_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
-    :param action_space: Action space or shape (default: None).
-                         If it is not None, the num_actions property will contain the size of that space
-    :type action_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
-    :param device: Device on which a tensor/array is or will be allocated (default: ``None``).
-                   If None, the device will be either ``"cuda"`` if available or ``"cpu"``
-    :type device: str or torch.device, optional
-    :param clip_actions: Flag to indicate whether the actions should be clipped (default: False)
-    :type clip_actions: bool, optional
-    :param clip_log_std: Flag to indicate whether the log standard deviations should be clipped (default: True)
-    :type clip_log_std: bool, optional
-    :param min_log_std: Minimum value of the log standard deviation (default: -20)
-    :type min_log_std: float, optional
-    :param max_log_std: Maximum value of the log standard deviation (default: 2)
-    :type max_log_std: float, optional
-    :param initial_log_std: Initial value for the log standard deviation (default: 0)
-    :type initial_log_std: float, optional
-    :param network: Network definition (default: [])
-    :type network: list of dict, optional
-    :param output: Output expression (default: "")
-    :type output: list or str, optional
-    :param return_source: Whether to return the source string containing the model class used to
-                          instantiate the model rather than the model instance (default: False).
-    :type return_source: bool, optional
+#     :param observation_space: Observation/state space or shape (default: None).
+#                               If it is not None, the num_observations property will contain the size of that space
+#     :type observation_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+#     :param action_space: Action space or shape (default: None).
+#                          If it is not None, the num_actions property will contain the size of that space
+#     :type action_space: int, tuple or list of integers, gym.Space, gymnasium.Space or None, optional
+#     :param device: Device on which a tensor/array is or will be allocated (default: ``None``).
+#                    If None, the device will be either ``"cuda"`` if available or ``"cpu"``
+#     :type device: str or torch.device, optional
+#     :param clip_actions: Flag to indicate whether the actions should be clipped (default: False)
+#     :type clip_actions: bool, optional
+#     :param clip_log_std: Flag to indicate whether the log standard deviations should be clipped (default: True)
+#     :type clip_log_std: bool, optional
+#     :param min_log_std: Minimum value of the log standard deviation (default: -20)
+#     :type min_log_std: float, optional
+#     :param max_log_std: Maximum value of the log standard deviation (default: 2)
+#     :type max_log_std: float, optional
+#     :param initial_log_std: Initial value for the log standard deviation (default: 0)
+#     :type initial_log_std: float, optional
+#     :param network: Network definition (default: [])
+#     :type network: list of dict, optional
+#     :param output: Output expression (default: "")
+#     :type output: list or str, optional
+#     :param return_source: Whether to return the source string containing the model class used to
+#                           instantiate the model rather than the model instance (default: False).
+#     :type return_source: bool, optional
 
-    :return: Gaussian model instance or definition source
-    :rtype: Model
-    """
+#     :return: Gaussian model instance or definition source
+#     :rtype: Model
+#     """
 
 
-    rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
-    rnn_num_layers = kwargs.get('rnn_num_layers', None)
-    rnn_num_envs = kwargs.get('num_envs', None)
-    rnn_sequence_length = kwargs.get('rnn_sequence_length', None)
-    rnn_param = {
-        "rnn_hidden_size": rnn_hidden_size, 
-        "rnn_num_layers": rnn_num_layers, 
-        "rnn_num_envs": rnn_num_envs, 
-        "rnn_sequence_length": rnn_sequence_length
-    }
+#     rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
+#     rnn_num_layers = kwargs.get('rnn_num_layers', None)
+#     rnn_num_envs = kwargs.get('num_envs', None)
+#     rnn_sequence_length = kwargs.get('rnn_sequence_length', None)
+#     rnn_param = {
+#         "rnn_hidden_size": rnn_hidden_size, 
+#         "rnn_num_layers": rnn_num_layers, 
+#         "rnn_num_envs": rnn_num_envs, 
+#         "rnn_sequence_length": rnn_sequence_length
+#     }
 
-    class GaussianModel(GaussianMixin, Model):
-        def __init__(self, observation_space, action_space, device, clip_actions,
-                        clip_log_std, min_log_std, max_log_std, reduction="sum"):
-            Model.__init__(self, observation_space, action_space, device)
-            GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
+#     class GaussianModel(GaussianMixin, Model):
+#         def __init__(self, observation_space, action_space, device, clip_actions,
+#                         clip_log_std, min_log_std, max_log_std, reduction="sum"):
+#             Model.__init__(self, observation_space, action_space, device)
+#             GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
 
-            rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
-            rnn_num_layers = kwargs.get('rnn_num_layers', None)
-            rnn_num_envs = kwargs.get('num_envs', None)
-            rnn_sequence_length = kwargs.get('rnn_sequence_length', None)
+#             rnn_hidden_size = kwargs.get('rnn_hidden_size', None)
+#             rnn_num_layers = kwargs.get('rnn_num_layers', None)
+#             rnn_num_envs = kwargs.get('num_envs', None)
+#             rnn_sequence_length = kwargs.get('rnn_sequence_length', None)
             
-            self.net_container1 = nn.Sequential(
-                nn.LazyLinear(out_features=128),
-                nn.ELU(),
-            )
+#             self.net_container1 = nn.Sequential(
+#                 nn.LazyLinear(out_features=128),
+#                 nn.ELU(),
+#             )
 
-            self.lstm = nn.LSTM(input_size=self.feature_extractor_size,
-                                hidden_size=self.hidden_size,
-                                num_layers=self.num_layers,
-                                batch_first=True)
+#             self.lstm = nn.LSTM(input_size=self.feature_extractor_size,
+#                                 hidden_size=self.hidden_size,
+#                                 num_layers=self.num_layers,
+#                                 batch_first=True)
 
-            self.net_container2 = nn.Sequential(
-                nn.LazyLinear(out_features=64), 
-                nn.ELU(),
-                nn.LazyLinear(out_features=self.num_actions), 
-            )
+#             self.net_container2 = nn.Sequential(
+#                 nn.LazyLinear(out_features=64), 
+#                 nn.ELU(),
+#                 nn.LazyLinear(out_features=self.num_actions), 
+#             )
 
-            self.log_std_parameter = nn.Parameter(0 * torch.ones(2))
+#             self.log_std_parameter = nn.Parameter(0 * torch.ones(2))
 
-        def get_specification(self):
-            return {"rnn": {"sequence_length": self.sequence_length,
-                            "sizes": [(self.num_layers, self.num_envs, self.hidden_size),
-                                    (self.num_layers, self.num_envs, self.hidden_size)]}}
+#         def get_specification(self):
+#             return {"rnn": {"sequence_length": self.sequence_length,
+#                             "sizes": [(self.num_layers, self.num_envs, self.hidden_size),
+#                                     (self.num_layers, self.num_envs, self.hidden_size)]}}
 
-        def compute(self, inputs, role=""):
+#         def compute(self, inputs, role=""):
 
-            states = inputs["states"]
-            terminated = inputs.get("terminated", None)
-            hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
+#             states = inputs["states"]
+#             terminated = inputs.get("terminated", None)
+#             hidden_states, cell_states = inputs["rnn"][0], inputs["rnn"][1]
 
-            features_states = self.net_container1(states)
+#             features_states = self.net_container1(states)
 
-            features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
+#             features_states = features_states.view(-1, 1, self.feature_extractor_size)  # shape: (batch_size, 1, input_size)
 
-            if terminated is not None and torch.any(terminated):
-                terminated_indices = terminated.squeeze().nonzero(as_tuple=True)[0]  # Get indices of terminated environments
+#             if terminated is not None and torch.any(terminated):
+#                 terminated_indices = terminated.squeeze().nonzero(as_tuple=True)[0]  # Get indices of terminated environments
                 
-                # Reset the states for terminated environments
-                hidden_states[0, terminated_indices, :] = 0
-                cell_states[0, terminated_indices, :] = 0
+#                 # Reset the states for terminated environments
+#                 hidden_states[0, terminated_indices, :] = 0
+#                 cell_states[0, terminated_indices, :] = 0
 
-            rnn_output, (hidden_states, cell_states) = self.lstm(features_states, (hidden_states.contiguous(), cell_states.contiguous()))
+#             rnn_output, (hidden_states, cell_states) = self.lstm(features_states, (hidden_states.contiguous(), cell_states.contiguous()))
 
-            rnn_states = (hidden_states, cell_states)
+#             rnn_states = (hidden_states, cell_states)
             
-            output = self.post_lstm(rnn_output)
-            output = torch.squeeze(output)
+#             output = self.post_lstm(rnn_output)
+#             output = torch.squeeze(output)
 
-            return output, self.log_std_parameter, {"rnn": [rnn_states[0], rnn_states[1]]}
+#             return output, self.log_std_parameter, {"rnn": [rnn_states[0], rnn_states[1]]}
 
-    return GaussianModel(observation_space=observation_space,
-                                    action_space=action_space,
-                                    device=device,
-                                    clip_actions=clip_actions,
-                                    clip_log_std=clip_log_std,
-                                    min_log_std=min_log_std,
-                                    max_log_std=max_log_std, 
-                                    rnn_param=rnn_param)
+#     return GaussianModel(observation_space=observation_space,
+#                                     action_space=action_space,
+#                                     device=device,
+#                                     clip_actions=clip_actions,
+#                                     clip_log_std=clip_log_std,
+#                                     min_log_std=min_log_std,
+#                                     max_log_std=max_log_std, 
+#                                     rnn_param=rnn_param)
 
 
 def custom_deterministic_model(observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
