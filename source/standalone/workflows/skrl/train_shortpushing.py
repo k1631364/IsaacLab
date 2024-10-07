@@ -135,13 +135,13 @@ def main():
     models = {}
     # non-shared models
     if experiment_cfg["models"]["separate"]:
-        models["policy"] = custom_gaussian_model2(
+        models["policy"] = gaussian_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,
             **process_skrl_cfg(experiment_cfg["models"]["policy"]),
         )
-        models["value"] = custom_deterministic_model(
+        models["value"] = deterministic_model(
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=env.device,

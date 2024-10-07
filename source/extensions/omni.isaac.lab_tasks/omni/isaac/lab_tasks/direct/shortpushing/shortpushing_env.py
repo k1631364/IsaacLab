@@ -62,7 +62,7 @@ class EventCfg:
   )
 
 @configclass
-class ExplorationEnvCfg(DirectRLEnvCfg):
+class ShortPushingEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -102,7 +102,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.032
-    puck_default_pos = 1.1
+    puck_default_pos = 1.2
     cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cylinderpuck2",
         spawn=sim_utils.CylinderCfg(
@@ -118,7 +118,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
     )
 
     pusher_length = 0.013
-    pusher_default_pos = 1.2
+    pusher_default_pos = 1.3
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.SphereCfg(
@@ -135,8 +135,8 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
  
     # Goal
     goal_location = 0.5  # the cart is reset if it exceeds that position [m]
-    goal_location = [0.5, 0.0, 1.0]
-    goal_length = 0.1
+    goal_location = [0.5, 0.0, 1.01]
+    goal_length = 0.05
     max_puck_goalcount = 10
 
     markergoal1_cfg = VisualizationMarkersCfg(
@@ -179,7 +179,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
     episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 14
+    num_observations = 11
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -196,10 +196,10 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
     rew_scale_timestep = 0.001
     rew_scale_pushervel = -0.1
 
-class ExplorationEnv(DirectRLEnvFeedback):
-    cfg: ExplorationEnvCfg
+class ShortPushingEnv(DirectRLEnvFeedback):
+    cfg: ShortPushingEnvCfg
 
-    def __init__(self, cfg: ExplorationEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: ShortPushingEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
 
@@ -232,15 +232,15 @@ class ExplorationEnv(DirectRLEnvFeedback):
         self.success_threshold = 0.2
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
-        self.goal_threshold = 0.1
+        self.goal_threshold = self.cfg.goal_length
         
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = 0.0
-        self.goal_location_max_x = 0.75
-        self.goal_location_min_y = -0.3
-        self.goal_location_max_y = 0.3
+        self.goal_location_min_x = 1.0 #0.0
+        self.goal_location_max_x = 1.4 #0.75
+        self.goal_location_min_y = -0.2 #-0.3
+        self.goal_location_max_y = 0.2 #0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
@@ -585,11 +585,11 @@ class ExplorationEnv(DirectRLEnvFeedback):
 
 
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), norma        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)lized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
-        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, denormalsied_estimated_prop), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_prop_rl), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1)), dim=1)        
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)        
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions.view(-1,1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), normalized_com_x.view(-1, 1), normalized_com_y.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs, normalized_past_puck_vel_obs, normalized_past_pusher_pos_obs, normalized_past_pusher_vel_obs, normalized_goal_tensor.view(-1, 1), dynamic_frictions.view(-1,1)), dim=1)

@@ -111,7 +111,7 @@ def main():
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
     max_episode_length = env.unwrapped.max_episode_length
-    max_total_episode_num = 2000
+    max_total_episode_num = 10
     memory_size = max_episode_length*max_total_episode_num  # experiment_cfg["agent"]["rollouts"]  # memory_size is the agent's number of rollouts
     memory = RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
     
@@ -120,13 +120,13 @@ def main():
 
     memory.create_tensor(name="states", size=observation_shape[0], dtype=torch.float32)
     memory.create_tensor(name="actions", size=action_shape[0], dtype=torch.float32)
-    memory.create_tensor(name="rewards", size=env.num_envs, dtype=torch.float32)
-    memory.create_tensor(name="terminated", size=env.num_envs, dtype=torch.bool)
-    memory.create_tensor(name="truncated", size=env.num_envs, dtype=torch.bool)
-    memory.create_tensor(name="log_prob", size=env.num_envs, dtype=torch.float32)
-    memory.create_tensor(name="values", size=env.num_envs, dtype=torch.float32)
-    memory.create_tensor(name="returns", size=env.num_envs, dtype=torch.float32)
-    memory.create_tensor(name="advantages", size=env.num_envs, dtype=torch.float32)
+    memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
+    memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
+    memory.create_tensor(name="truncated", size=1, dtype=torch.bool)
+    memory.create_tensor(name="log_prob", size=1, dtype=torch.float32)
+    memory.create_tensor(name="values", size=1, dtype=torch.float32)
+    memory.create_tensor(name="returns", size=1, dtype=torch.float32)
+    memory.create_tensor(name="advantages", size=1, dtype=torch.float32)
     memory.create_tensor(name="props", size=3, dtype=torch.float32)
 
     agent = PPO_RNN(

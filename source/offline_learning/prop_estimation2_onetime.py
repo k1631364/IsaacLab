@@ -29,7 +29,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 
 import torch
-from torch.utils.data import DataLoader, Dataset, TensorDataset, random_split
+from torch.utils.data import DataLoader, Dataset, Subset, TensorDataset, random_split 
 from tqdm import tqdm
 import torch.optim as optim
 import torch.nn as nn
@@ -38,6 +38,8 @@ import pickle
 
 import model.VAE as vaemodel
 import model.RNNPropertyEstimator as rnnmodel
+import model.LSTM as lstmmodel
+
 
 # from skrl.resources.preprocessors.torch import RunningStandardScaler
 
@@ -54,7 +56,7 @@ class PolicyOfflineDataset(Dataset):
     
     def __getitem__(self, idx):
         # return self.data[idx,:], self.labels[idx,0]
-        return self.data[idx,:,:], self.labels[idx,:,:]    
+        return self.data[idx, :], self.labels[idx, :]    
     
 
 class LSTMPropertyEstimator(nn.Module):
@@ -137,21 +139,14 @@ def main():
 
     # Use gpu if available. Otherwise, use cpu. 
     torch_device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
-    
-    # H5 file path (to read)
+
+    # Fig file path (to save)
     log_root_path = os.path.join("logs", "prop_estimation", "offline_prop_estimation")
     log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  
     log_dir = os.path.join(log_root_path, log_dir)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-17_12-56-47/test.hdf5"
-    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-19_17-52-50/test.hdf5"
-    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-07-20_22-58-43/test.hdf5"
-    # log_h5_path = "/workspace/isaaclab/logs/exp_data/predefined_slide/2024-08-06_10-19-43/test.hdf5"
 
-    # logs/exp_data/predefined_slide/2024-08-06_09-53-14/test.hdf5
-
-    # Fig file path (to save)
     log_fig_dir = os.path.join(log_dir, "figure")
     if not os.path.exists(log_fig_dir):
         os.makedirs(log_fig_dir)
@@ -165,6 +160,7 @@ def main():
     all_labels_list = []
     # Read memories
     # memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-09-10_13-09-18_test2" 
+    # memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-10-05_13-11-26"
     memories_path = "/workspace/isaaclab/logs/skrl/sliding_direct_test/2024-10-05_13-11-26"
     # /workspace/isaaclab/logs/skrl/sliding_direct_test/2024-09-10_13-09-18
     for memory_dir in os.listdir(memories_path):
@@ -215,8 +211,6 @@ def main():
         props_transposed_data = memory_all_props.transpose(0, 1)
         props_reshaped_data = props_transposed_data.reshape(-1, memory_all_props.shape[2])
 
-        print(props_reshaped_data.shape)
-
         ### Remove data with NaN ###
         nan_mask = torch.isnan(states_reshaped_data[:, 0])
         # print(states_reshaped_data.shape)
@@ -226,108 +220,17 @@ def main():
         # print(data.shape)
         data = data[~nan_mask, :]
         label = torch.cat((props_reshaped_data, terminated_reshaped_data), dim=1)
+        # print(label.shape)
         label = label[~nan_mask, :]
         print(data.shape)
         print(label.shape)
+        # print(nan_mask)
 
-        ### Chunk into shorter senquences ###
-        # Set sequence length
-        sequence_length = 15
+        import sys
+        sys.exit(0)
 
-        # Ensure the total number of data points is divisible by sequence_length
-        remainder = data.size(0) % sequence_length
-        if remainder != 0:
-            data = data[:-remainder]  # Trim the excess data points
-
-        num_sequences = data.size(0) // sequence_length
-        chunked_data = data.view(num_sequences, sequence_length, -1)
-
-        # Ensure the total number of label points is divisible by sequence_length
-        remainder = label.size(0) % sequence_length
-        if remainder != 0:
-            label = label[:-remainder]  # Trim the excess label points
-
-        num_sequences = label.size(0) // sequence_length
-        chunked_label = label.view(num_sequences, sequence_length, -1)
-
-        print("Chunked data")
-        print(chunked_data.shape)
-        print(chunked_label.shape)
-
-        ### Cut and pad the sequence with termination ### 
-        # Find sequences that contain a `1` in the last dimension
-        contains_one_mask = (chunked_data[:, :, -1] == 1).any(dim=1)
-        # Remove sequences that contain `1` in the last dimension
-        padded_data = chunked_data[~contains_one_mask]
-
-        # Find sequences that contain a `1` in the last dimension
-        contains_one_mask = (chunked_label[:, :, -1] == 1).any(dim=1)
-        # Remove sequences that contain `1` in the last dimension
-        padded_label = chunked_label[~contains_one_mask]
-
-        # # For data
-        # # Get the termination mask where `1` occurs in the third dimension
-        # terminated_mask = (chunked_data[:, :, -1] == 1).int()
-
-        # # Find the index of the first occurrence of `1` for each sequence
-        # first_one_index = terminated_mask.argmax(dim=1)
-
-        # # Calculate the length of the original sequence
-        # seq_len = chunked_data.size(1)
-
-        # # Create a tensor of index [0, 1, 2, ..., seq_len-1]
-        # seq_index = torch.arange(seq_len, device=chunked_data.device).unsqueeze(0).expand(chunked_data.size(0), -1)
-
-        # # Create a mask to keep only the values up to and including the first occurrence of `1`
-        # cutoff_mask = seq_index <= first_one_index.unsqueeze(1)
-
-        # # Prepare to cut off and pad
-        # padded_data = torch.zeros_like(chunked_data)
-
-        # # Copy the data up to the first occurrence of `1` into the padded_data tensor
-        # for i in range(chunked_data.size(0)):
-        #     length = cutoff_mask[i].sum().item()
-        #     padded_data[i, -length:] = chunked_data[i, :length]
-
-        # # For labels
-        # terminated_mask = (chunked_label[:, :, -1] == 1).int()
-
-        # # Find the index of the first occurrence of `1` for each sequence
-        # first_one_index = terminated_mask.argmax(dim=1)
-
-        # # Calculate the length of the original sequence
-        # seq_len = chunked_label.size(1)
-
-        # # Create a tensor of index [0, 1, 2, ..., seq_len-1]
-        # seq_index = torch.arange(seq_len, device=chunked_label.device).unsqueeze(0).expand(chunked_label.size(0), -1)
-
-        # # Create a mask to keep only the values up to and including the first occurrence of `1`
-        # cutoff_mask = seq_index <= first_one_index.unsqueeze(1)
-
-        # # Prepare to cut off and pad
-        # padded_label = torch.zeros_like(chunked_label)
-
-        # # Extract the first value of each sequence for padding
-        # first_values = chunked_label[:, 0, :]  # Assuming the first value to pad with is the first value in the sequence
-
-        # # Copy the label up to the first occurrence of `1` into the padded_label tensor with the first value = fric not 0
-        # for i in range(chunked_label.size(0)):
-        #     length = cutoff_mask[i].sum().item()
-        #     # Fill the padded_label with the first value for padding
-        #     padded_label[i, -length:] = chunked_label[i, :length]
-        #     # Pad the beginning with the first value of the sequence
-        #     if length < seq_len:
-        #         padded_label[i, :-length] = first_values[i]
-
-        ### Remove termination data ###
-        filtered_data = padded_data[:, :, :-1]
-        filtered_label = padded_label[:, :, :-1]
-
-        print(filtered_data.shape)
-        print(filtered_label.shape)
-
-        all_data_list.append(filtered_data)
-        all_labels_list.append(filtered_label)
+        all_data_list.append(data)
+        all_labels_list.append(label)
 
     all_data_tensor = torch.cat(all_data_list, dim=0)
     all_labels_tensor = torch.cat(all_labels_list, dim=0)
@@ -345,9 +248,9 @@ def main():
     velocity_index = [5, 6]
 
     # Extract features
-    positions = all_data_tensor[:, :, position_index]
-    rotation = all_data_tensor[:, :, rotation_index]
-    velocities = all_data_tensor[:, :, velocity_index]
+    positions = all_data_tensor[:, position_index]
+    rotation = all_data_tensor[:, rotation_index]
+    velocities = all_data_tensor[:, velocity_index]
 
     # Compute min and max for each feature category
     pos_min = positions.min()
@@ -367,17 +270,17 @@ def main():
 
     # Reconstruct the normalized data tensor
     normalized_data = all_data_tensor.clone()
-    normalized_data[:, :, position_index] = normalized_positions
-    normalized_data[:, :, rotation_index] = normalized_rotation
-    normalized_data[:, :, velocity_index] = normalized_velocities
+    normalized_data[:, position_index] = normalized_positions
+    normalized_data[:, rotation_index] = normalized_rotation
+    normalized_data[:, velocity_index] = normalized_velocities
 
     # Define index for position, rotation, and velocity features
     friction_index = 0
     com_index = [1, 2]
 
     # Extract features
-    frictions = all_labels_tensor[:, :, friction_index]
-    coms = all_labels_tensor[:, :, com_index]
+    frictions = all_labels_tensor[:, friction_index]
+    coms = all_labels_tensor[:, com_index]
 
     # Compute min and max for each feature category
     fric_min = frictions.min()
@@ -399,8 +302,8 @@ def main():
 
     # Reconstruct the normalized data tensor
     normalized_labels = all_labels_tensor.clone()
-    normalized_labels[:, :, friction_index] = normalized_friction
-    normalized_labels[:, :, com_index] = normalized_com
+    normalized_labels[:, friction_index] = normalized_friction
+    normalized_labels[:, com_index] = normalized_com
 
     print(normalized_labels.shape)
 
@@ -409,42 +312,64 @@ def main():
     train_size = int(0.8 * len(full_dataset))  # 80% of the data for training
     test_size = len(full_dataset) - train_size  # Remaining 20% for testing
 
-    # Split dataset into training and test sets
-    train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+    # # Split dataset into training and test sets
+    # train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
 
-    batch_size = 64 # 64
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Manually split the dataset while keeping the order
+    train_dataset = Subset(full_dataset, range(train_size))  # First 80%
+    test_dataset = Subset(full_dataset, range(train_size, len(full_dataset)))  # Last 20%
+
+    batch_size = 1 # 64
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
     # Example DataLoader for test set
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Example dimensions
     input_size = 7 # 11  # State and action concatenated size
-    hidden_size = 64    # Number of features in hidden state
+    hidden_size = 100    # Number of features in hidden state
     num_layers = 1      # Number of LSTM layers
     output_size = 1     # Number of physical properties (e.g., friction, CoM)
     num_epochs = 1000
     learning_rate = 0.001
 
-    model = rnnmodel.RNNPropertyEstimator(input_size, hidden_size, num_layers, output_size).to(torch_device)
+    model = lstmmodel.LSTM(input_size, hidden_size, num_layers, output_size).to(torch_device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     model.train()
     
+    h_prev = torch.zeros(num_layers, batch_size, hidden_size).to(torch_device)
+    c_prev = torch.zeros(num_layers, batch_size, hidden_size).to(torch_device)
+
+    # print("Hidden")
+    # print(h_prev.shape)
+    # print(c_prev.shape) 
+
     for epoch in range(num_epochs):
         for inputs, targets in train_loader:
             # Concatenate state and action vectors
+            # print("Input shape")
+            # print(inputs.shape)
+            # print("Targrt")
+            # print(targets.shape)
+
+            # print("input termination")
+            # print(inputs[:,-1])
+            # print(targets[:,-1])
+
+            terminated = inputs[:,-1]
+            # print(terminated.shape)
+
+            inputs = inputs[:,:-1].reshape(-1, 1, input_size)
+
             inputs = inputs.to(torch_device)
             targets = targets.to(torch_device)
             # targets = targets[:, -1, :]
-            targets = targets[:, -1, 0].view(-1,1)
+            targets = targets[:, -1].reshape(-1,1)
 
             # Forward pass
-            # print("Inputtttt")
-            # print(inputs.shape)
-            # print(targets.shape)
-            outputs = model(inputs)
+            outputs, h_prev, c_prev = model(inputs, h_prev, c_prev, terminated)
             loss = criterion(outputs, targets)
             
             # Backward pass and optimization
@@ -474,7 +399,7 @@ def main():
         "optimizer": optimizer, 
         "model_path": model_path, 
 
-        "sequence_length": sequence_length, 
+        # "sequence_length": sequence_length, 
 
         "position_index": position_index, 
         "rotation_index": rotation_index, 
