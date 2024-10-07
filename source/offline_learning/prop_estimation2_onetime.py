@@ -56,6 +56,7 @@ class PolicyOfflineDataset(Dataset):
     
     def __getitem__(self, idx):
         # return self.data[idx,:], self.labels[idx,0]
+        # return self.data[idx, :], self.labels[idx, :]  
         return self.data[idx, :], self.labels[idx, :]    
     
 
@@ -170,13 +171,12 @@ def main():
         # print(memory_path)
         
         files = [f for f in os.listdir(memory_path) if os.path.isfile(os.path.join(memory_path, f))]
-        # print(files)
 
         # numbers = re.findall(r'\d+', checkpoint_file)
         # if numbers:
         #     number_part = int(numbers[0])
 
-        memory_filename = os.path.join(memory_path, files[0])
+        memory_filename = os.path.join(memory_path, files[1])
         print(memory_filename)
 
         memory_all = torch.load(memory_filename)
@@ -186,11 +186,13 @@ def main():
         # print(memory_all["props"][:100,:,:]) 
 
         ### Stack data from all envs ###
-        selected_envs_num = 1
+        selected_envs_num = 100
 
         # memory_all_states = memory_all["states"][:,:selected_envs_num,0:9]
         memory_all_states = memory_all["states"][:,:selected_envs_num,[0,1,2,5,6]]
         states_transposed_data = memory_all_states.transpose(0, 1)
+        print(states_transposed_data.shape)
+
         states_reshaped_data = states_transposed_data.reshape(-1, memory_all_states.shape[2])
 
         print(states_reshaped_data.shape)
@@ -212,22 +214,15 @@ def main():
         props_reshaped_data = props_transposed_data.reshape(-1, memory_all_props.shape[2])
 
         ### Remove data with NaN ###
-        nan_mask = torch.isnan(states_reshaped_data[:, 0])
-        # print(states_reshaped_data.shape)
-        # print(terminated_reshaped_data.shape)
-        # data = torch.cat((states_reshaped_data, terminated_reshaped_data), dim=1) 
-        data = torch.cat((states_reshaped_data, actions_reshaped_data, terminated_reshaped_data), dim=1) 
-        # print(data.shape)
-        data = data[~nan_mask, :]
-        label = torch.cat((props_reshaped_data, terminated_reshaped_data), dim=1)
-        # print(label.shape)
-        label = label[~nan_mask, :]
+        nan_mask = torch.isnan(states_transposed_data[0,:,0])
+
+        data = torch.cat((states_transposed_data, actions_transposed_data, terminated_transposed_data), dim=2)         
+        data = data[:, ~nan_mask, :]
+
+        label = torch.cat((props_transposed_data, terminated_transposed_data), dim=2)
+        label = label[:, ~nan_mask, :]
         print(data.shape)
         print(label.shape)
-        # print(nan_mask)
-
-        import sys
-        sys.exit(0)
 
         all_data_list.append(data)
         all_labels_list.append(label)
@@ -248,9 +243,9 @@ def main():
     velocity_index = [5, 6]
 
     # Extract features
-    positions = all_data_tensor[:, position_index]
-    rotation = all_data_tensor[:, rotation_index]
-    velocities = all_data_tensor[:, velocity_index]
+    positions = all_data_tensor[:, :, position_index]
+    rotation = all_data_tensor[:, :, rotation_index]
+    velocities = all_data_tensor[:, :, velocity_index]
 
     # Compute min and max for each feature category
     pos_min = positions.min()
@@ -270,17 +265,17 @@ def main():
 
     # Reconstruct the normalized data tensor
     normalized_data = all_data_tensor.clone()
-    normalized_data[:, position_index] = normalized_positions
-    normalized_data[:, rotation_index] = normalized_rotation
-    normalized_data[:, velocity_index] = normalized_velocities
+    normalized_data[:, :, position_index] = normalized_positions
+    normalized_data[:, :, rotation_index] = normalized_rotation
+    normalized_data[:, :, velocity_index] = normalized_velocities
 
     # Define index for position, rotation, and velocity features
     friction_index = 0
     com_index = [1, 2]
 
     # Extract features
-    frictions = all_labels_tensor[:, friction_index]
-    coms = all_labels_tensor[:, com_index]
+    frictions = all_labels_tensor[:, :, friction_index]
+    coms = all_labels_tensor[:, :, com_index]
 
     # Compute min and max for each feature category
     fric_min = frictions.min()
@@ -302,9 +297,13 @@ def main():
 
     # Reconstruct the normalized data tensor
     normalized_labels = all_labels_tensor.clone()
-    normalized_labels[:, friction_index] = normalized_friction
-    normalized_labels[:, com_index] = normalized_com
+    normalized_labels[:, :, friction_index] = normalized_friction
+    normalized_labels[:, :, com_index] = normalized_com
 
+    print(normalized_labels.shape)
+
+    print("normalised data shape")
+    print(normalized_data.shape)
     print(normalized_labels.shape)
 
     full_dataset = PolicyOfflineDataset(normalized_data, normalized_labels)
@@ -313,24 +312,24 @@ def main():
     test_size = len(full_dataset) - train_size  # Remaining 20% for testing
 
     # # Split dataset into training and test sets
-    # train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+    train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
 
-    # Manually split the dataset while keeping the order
-    train_dataset = Subset(full_dataset, range(train_size))  # First 80%
-    test_dataset = Subset(full_dataset, range(train_size, len(full_dataset)))  # Last 20%
+    # # Manually split the dataset while keeping the order
+    # train_dataset = Subset(full_dataset, range(train_size))  # First 80%
+    # test_dataset = Subset(full_dataset, range(train_size, len(full_dataset)))  # Last 20%
 
     batch_size = 1 # 64
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Example DataLoader for test set
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Example dimensions
     input_size = 7 # 11  # State and action concatenated size
-    hidden_size = 100    # Number of features in hidden state
+    hidden_size = 32    # Number of features in hidden state
     num_layers = 1      # Number of LSTM layers
     output_size = 1     # Number of physical properties (e.g., friction, CoM)
-    num_epochs = 1000
+    num_epochs = 500
     learning_rate = 0.001
 
     model = lstmmodel.LSTM(input_size, hidden_size, num_layers, output_size).to(torch_device)
@@ -338,44 +337,61 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     model.train()
-    
-    h_prev = torch.zeros(num_layers, batch_size, hidden_size).to(torch_device)
-    c_prev = torch.zeros(num_layers, batch_size, hidden_size).to(torch_device)
-
-    # print("Hidden")
-    # print(h_prev.shape)
-    # print(c_prev.shape) 
 
     for epoch in range(num_epochs):
         for inputs, targets in train_loader:
-            # Concatenate state and action vectors
-            # print("Input shape")
-            # print(inputs.shape)
-            # print("Targrt")
-            # print(targets.shape)
+            h_prev = torch.zeros(num_layers, inputs.shape[0], hidden_size).to(torch_device)
+            c_prev = torch.zeros(num_layers, inputs.shape[0], hidden_size).to(torch_device)
+        
+            for j in range(inputs.shape[1]-1):
 
-            # print("input termination")
-            # print(inputs[:,-1])
-            # print(targets[:,-1])
+                # # Concatenate state and action vectors
+                # print("Input shape")
+                # print(inputs.shape)
+                # print("Targrt")
+                # print(targets.shape)
+                
+                curr_input = inputs[:,j,:]
+                curr_target = targets[:,j,:]
 
-            terminated = inputs[:,-1]
-            # print(terminated.shape)
+                # print("Input shape")
+                # print(curr_input.shape)
+                # print("Targrt")
+                # print(curr_target.shape)
 
-            inputs = inputs[:,:-1].reshape(-1, 1, input_size)
+                # print("input termination")
+                # print(curr_input[:,-1])
+                # print(curr_target[:,-1])
 
-            inputs = inputs.to(torch_device)
-            targets = targets.to(torch_device)
-            # targets = targets[:, -1, :]
-            targets = targets[:, -1].reshape(-1,1)
+                curr_terminated = curr_input[:,-1]
+                # print(curr_terminated.shape)
 
-            # Forward pass
-            outputs, h_prev, c_prev = model(inputs, h_prev, c_prev, terminated)
-            loss = criterion(outputs, targets)
-            
-            # Backward pass and optimization
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                curr_input = curr_input[:,:-1].view(-1, 1, input_size)  # Drop terminated flag
+                curr_target = curr_target[:, 0].view(-1,1) # Get only friction label
+
+                # print(curr_input.shape)
+
+                curr_input = curr_input.to(torch_device)
+                curr_target = curr_target.to(torch_device)
+
+                mask = curr_terminated == 1  # Shape: [64]
+
+                # Use the mask to index into prev_h and prev_c and zero out the terminated states
+                # print("Check mask")
+                # print(h_prev.shape)
+                # print(c_prev.shape)
+                # print(mask.shape)
+                h_prev[:, mask, :] = 0
+                c_prev[:, mask, :] = 0
+
+                # Forward pass
+                outputs, h_prev, c_prev = model(curr_input, h_prev, c_prev)
+                loss = criterion(outputs, curr_target)
+                
+                # Backward pass and optimization
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
         
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
 
@@ -439,32 +455,57 @@ def main():
     targets_record_list = []
     outputs_record_list = []
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(test_loader):
-            inputs = inputs.to(torch_device)
-            targets = targets.to(torch_device)
-            # targets = targets[:, -1, :]
-            targets = targets[:, -1, 0].view(-1,1)
-            for i in range(len(inputs)):
-                input = inputs[i].unsqueeze(0)  # Add batch dimension
-                target = targets[i].unsqueeze(0)  # Add batch dimension
+        for inputs, targets in test_loader:
+            h_prev = torch.zeros(num_layers, inputs.shape[0], hidden_size).to(torch_device)
+            c_prev = torch.zeros(num_layers, inputs.shape[0], hidden_size).to(torch_device)
+        
+            for j in range(inputs.shape[1]-1):
 
-                # print(f"Sample index: {i}")
-                # print(f"Sample shape: {input.shape}")
-                # print(f"Label shape: {target.shape}")
+                # # Concatenate state and action vectors
+                # print("Input shape")
+                # print(inputs.shape)
+                # print("Targrt")
+                # print(targets.shape)
+                
+                curr_input = inputs[:,j,:]
+                curr_target = targets[:,j,:]
+
+                # print("Input shape")
+                # print(curr_input.shape)
+                # print("Targrt")
+                # print(curr_target.shape)
+
+                # print("input termination")
+                # print(curr_input[:,-1])
+                # print(curr_target[:,-1])
+
+                curr_terminated = curr_input[:,-1]
+                # print(curr_terminated.shape)
+
+                curr_input = curr_input[:,:-1].view(-1, 1, input_size)  # Drop terminated flag
+                curr_target = curr_target[:, 0].view(-1,1) # Get only friction label
+
+                # print(curr_input.shape)
+
+                curr_input = curr_input.to(torch_device)
+                curr_target = curr_target.to(torch_device)
+
+                mask = curr_terminated == 1  # Shape: [64]
+
+                # Use the mask to index into prev_h and prev_c and zero out the terminated states
+                # print("Check mask")
+                # print(h_prev.shape)
+                # print(c_prev.shape)
+                # print(mask.shape)
+                h_prev[:, mask, :] = 0
+                c_prev[:, mask, :] = 0
 
                 # Forward pass
-                # Input size torch.Size([1, 20, 4]) [batch_size, , seq_length, 4]
-                # Output size torch.Size([1, 1])    [batch_size, 1]
-                output = model(input)
-                loss = criterion(output, target)
+                outputs, h_prev, c_prev = model(curr_input, h_prev, c_prev)
+                loss = criterion(outputs, curr_target)
 
-                # print(f"Sample index: {i}")
-                # # print(f"Sample shape: {input}")
-                # print(f"Label shape: {target.shape}")
-                # print(f"Output shape: {output.shape}")
-                
-                targets_record_list.append(target)
-                outputs_record_list.append(output)
+                targets_record_list.append(curr_target)
+                outputs_record_list.append(outputs)
 
     targets_record = torch.cat(targets_record_list, dim=0)
     outputs_record = torch.cat(outputs_record_list, dim=0)

@@ -111,7 +111,7 @@ def main():
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
     max_episode_length = env.unwrapped.max_episode_length
-    max_total_episode_num = 10
+    max_total_episode_num = 1000
     memory_size = max_episode_length*max_total_episode_num  # experiment_cfg["agent"]["rollouts"]  # memory_size is the agent's number of rollouts
     memory = RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
     

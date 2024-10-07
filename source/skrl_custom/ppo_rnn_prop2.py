@@ -9,24 +9,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import source.nn_models.RNN as rnnmodel
+import torch.optim as optim
+
 from skrl import config, logger
 from skrl.agents.torch import Agent
 from skrl.memories.torch import Memory
 from skrl.models.torch import Model
 from skrl.resources.schedulers.torch import KLAdaptiveLR
 
-import source.nn_models.RNN as rnnmodel
-import torch.optim as optim
-
-import matplotlib.pyplot as plt
-import matplotlib
-
 def normalize(tensor, min_val, max_val, new_min, new_max):
     return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
 
 def denormalize(tensor, min_val, max_val, new_min, new_max):
     return (tensor - new_min) / (new_max - new_min) * (max_val - min_val) + min_val
-
 
 # [start-config-dict-torch]
 PPO_DEFAULT_CONFIG = {
@@ -76,7 +72,8 @@ PPO_DEFAULT_CONFIG = {
 }
 # [end-config-dict-torch]
 
-class PPO_RNN_PROP(Agent):
+
+class PPO_RNN2(Agent):
     def __init__(self,
                  models: Mapping[str, Model],
                  memory: Optional[Union[Memory, Tuple[Memory]]] = None,
@@ -187,10 +184,8 @@ class PPO_RNN_PROP(Agent):
             self.checkpoint_modules["value_preprocessor"] = self._value_preprocessor
         else:
             self._value_preprocessor = self._empty_preprocessor
-        
-        # print("Running ppo rnn proppppppp")
-        # print(self.cfg["prop_estimator"]["input_size"])
-        
+
+        ### Setup property estimator ### 
         input_size = self.cfg["prop_estimator"]["input_size"]  # State and action concatenated size
         hidden_size = self.cfg["prop_estimator"]["hidden_size"]    # Number of features in hidden state
         num_layers = self.cfg["prop_estimator"]["num_layers"]      # Number of LSTM layers
@@ -220,19 +215,16 @@ class PPO_RNN_PROP(Agent):
         self.prop_criterion = nn.MSELoss()
         self.prop_optimizer = optim.Adam(self.prop_model.parameters(), lr=learning_rate)
 
-        if self.cfg["prop_estimator"]["train"]: 
-            self.prop_model.train()
-            print("Train prop model from scratchs")
-        else: 
-            self.prop_model.eval()
-            trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-07_22-26-19/checkpoints_prop/LSTM_best.pth"
-            self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
-            print("Load prop model")
-
+        # if self.cfg["prop_estimator"]["train"]: 
+        #     self.prop_model.train()
+        # else: 
+        #     self.prop_model.eval()
         self.prop_model.eval()
 
         self.curr_rollout_rnn_input = []
         self.curr_rollout_rnn_target = []
+
+        self.success_rate = 0.0
 
     def init(self, trainer_cfg: Optional[Mapping[str, Any]] = None) -> None:
         """Initialize the agent
@@ -250,11 +242,6 @@ class PPO_RNN_PROP(Agent):
             self.memory.create_tensor(name="values", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="returns", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="advantages", size=1, dtype=torch.float32)
-
-            # print("RNn param received in agent")
-            # print(self.policy.get_rnn_param())
-            # self.rnn_param = self.policy.get_rnn_param()
-            # self.memory.create_tensor(name="state_hist", size=(self.rnn_param["rnn_num_envs"], self.rnn_param["rnn_sequence_length"], self.observation_space.shape[0]), dtype=torch.float32)
 
             # tensors sampled during training
             self._tensors_names = ["states", "actions", "terminated", "log_prob", "values", "returns", "advantages"]
@@ -294,6 +281,24 @@ class PPO_RNN_PROP(Agent):
         self._current_log_prob = None
         self._current_next_states = None
 
+        # print("Check memory initialisationnnn")
+        # print(self.memory.get_tensor_names())
+        # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
+        # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
+        # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
+        # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
+        # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
+        # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
+        # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
+        # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
+        # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
+        # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
+        # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
+        # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
+
+        # import sys
+        # sys.exit(0)
+
     def act(self, states: torch.Tensor, infos: dict, timestep: int, timesteps: int) -> torch.Tensor:
         """Process the environment's states to make a decision (actions) using the main policy
 
@@ -308,82 +313,111 @@ class PPO_RNN_PROP(Agent):
         :rtype: torch.Tensor
         """
 
-        curr_rnn_prop_input = infos["rnn_input"]
-        # print("Current input")
-        # print(curr_rnn_prop_input)
+        if "log" in infos:
+            # print(infos["log"]["success_rate"])
+            self.success_rate = infos["log"]["success_rate"]
 
-        normalized_curr_rnn_prop_input = curr_rnn_prop_input.clone()
+        if self.success_rate > -0.01: 
+            curr_rnn_prop_input = infos["rnn_input"]
 
-        position = curr_rnn_prop_input[:, :, self.position_index]
-        rotation = curr_rnn_prop_input[:, :, self.rotation_index]
+            # print("Current input")
+            # print(curr_rnn_prop_input)
 
-        normalized_position = normalize(position, self.pos_min, self.pos_max, self.feature_target_min, self.feature_target_max)
-        normalized_rotation = normalize(rotation, self.rot_min, self.rot_max, self.feature_target_min, self.feature_target_max)
-        
-        velocities = curr_rnn_prop_input[:, :, self.velocity_index]
-        normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
+            normalized_curr_rnn_prop_input = curr_rnn_prop_input.clone()
 
-        normalized_curr_rnn_prop_input[:, :, self.position_index] = normalized_position
-        normalized_curr_rnn_prop_input[:, :, self.rotation_index] = normalized_rotation
-        normalized_curr_rnn_prop_input[:, :, self.velocity_index] = normalized_velocities
+            position = curr_rnn_prop_input[:, :, self.position_index]
+            rotation = curr_rnn_prop_input[:, :, self.rotation_index]
 
-        self.curr_rollout_rnn_input.append(normalized_curr_rnn_prop_input)
-        # self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
+            normalized_position = normalize(position, self.pos_min, self.pos_max, self.feature_target_min, self.feature_target_max)
+            normalized_rotation = normalize(rotation, self.rot_min, self.rot_max, self.feature_target_min, self.feature_target_max)
+            
+            velocities = curr_rnn_prop_input[:, :, self.velocity_index]
+            normalized_velocities = normalize(velocities, self.vel_min, self.vel_max, self.feature_target_min, self.feature_target_max)
 
-        curr_rnn_prop_target = infos["prop"][:,0].reshape(-1,1)
-        frictions = curr_rnn_prop_target
-        normalized_friction = normalize(frictions, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
-        normalized_curr_rnn_prop_target = normalized_friction
+            normalized_curr_rnn_prop_input[:, :, self.position_index] = normalized_position
+            normalized_curr_rnn_prop_input[:, :, self.rotation_index] = normalized_rotation
+            normalized_curr_rnn_prop_input[:, :, self.velocity_index] = normalized_velocities
 
-        self.curr_rollout_rnn_target.append(normalized_curr_rnn_prop_target)
+            # mask = ~torch.isnan(normalized_curr_rnn_prop_input[:,:,-1]).any(dim=1)
+            # filtered_data = normalized_curr_rnn_prop_input[mask]
 
-        # print("Current shapeeeee")
-        # print(curr_rnn_prop_input.shape)
-        # print(curr_rnn_prop_target.shape)
+            self.curr_rollout_rnn_input.append(normalized_curr_rnn_prop_input)
+            # self.curr_rollout_rnn_input.append(filtered_data)
+            # self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
 
-        normalized_output = self.prop_model(normalized_curr_rnn_prop_input)
+            curr_rnn_prop_target = infos["prop"][:,0].reshape(-1,1)
+            frictions = curr_rnn_prop_target
+            normalized_friction = normalize(frictions, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+            normalized_curr_rnn_prop_target = normalized_friction
 
-        denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
-        denormalsied_target = denormalize(normalized_curr_rnn_prop_target, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+            # target_mask = ~torch.isnan(normalized_curr_rnn_prop_target[:,0]).any(dim=1)
+            # filtered_target = normalized_curr_rnn_prop_target[mask]
 
-        # mean_friction = 0.5
-        # weight = 1+ torch.abs(normalized_curr_rnn_prop_target-mean_friction)
-        # rnn_loss = torch.mean(weight*(normalized_output-normalized_curr_rnn_prop_target)**2)
-        
-        rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
-        rnn_rmse = torch.sqrt(self.prop_criterion(denormalsied_output, curr_rnn_prop_target))
-        # print(output)
-        # print(loss)
+            self.curr_rollout_rnn_target.append(normalized_curr_rnn_prop_target)
+            # self.curr_rollout_rnn_target.append(filtered_target)
 
-        # print("Estimation loss")
-        # print(denormalsied_target)
-        # print("Denormalised output")
-        # print(denormalsied_output)
-        # print(rnn_rmse)
+            # print("Filetered dsata check")
+            # print(len(self.curr_rollout_rnn_input))
+            # print(len(self.curr_rollout_rnn_target))
+            # print(self.curr_rollout_rnn_input[len(self.curr_rollout_rnn_input)-1].shape)
+            # print(self.curr_rollout_rnn_target[len(self.curr_rollout_rnn_target)-1].shape)
 
-        prop_estimator_output = {
-            "rnn_loss": rnn_loss, 
-            "rnn_rmse": rnn_rmse, 
-            "normalized_output": normalized_output, 
-            "denormalsied_output": denormalsied_output,
-            "denormalsied_target": denormalsied_target
-        }
+            # print("Current shapeeeee")
+            # print(curr_rnn_prop_input.shape)
+            # print(curr_rnn_prop_target.shape)
 
-        # with torch.no_grad():
-        #     for batch_idx, (inputs, targets) in enumerate(test_loader):
-        #         inputs = inputs.to(torch_device)
-        #         targets = targets.to(torch_device)
-        #         # targets = targets[:, -1, :]
-        #         targets = targets[:, -1, 0].view(-1,1)
-        #         for i in range(len(inputs)):
-        #             input = inputs[i].unsqueeze(0)  # Add batch dimension
-        #             target = targets[i].unsqueeze(0)  # Add batch dimension
+            # self.prop_model.eval()
+            # print("Check rnn input size")
+            # print(normalized_curr_rnn_prop_input.shape)
+            with torch.no_grad():
+                # print(normalized_curr_rnn_prop_input)
+                # mask = ~torch.isnan(normalized_curr_rnn_prop_input[:,:,-1]).any(dim=1)
 
-        #             output = model(input)
-        #             loss = criterion(output, target)
+                # filtered_data = normalized_curr_rnn_prop_input[mask]
 
-    
-        
+                normalized_output = self.prop_model(normalized_curr_rnn_prop_input).detach()
+
+                # final_output = torch.zeros(normalized_curr_rnn_prop_input.shape[0], 1).to(self.device)  # Shape: [4096, 1]
+                
+                # Assign neural network outputs to the corresponding environments
+                # print(normalized_output.shape)
+                # final_output[mask] = normalized_output # Assign outputs for valid environments
+
+                # print(final_output.shape)
+
+                # # Reshape final_output to match the original data shape, if needed
+                # final_output_tensor = final_output.unsqueeze(1).expand(-1, 15)  # Shape: [4096, 15]
+            
+            denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+            denormalsied_target = denormalize(normalized_curr_rnn_prop_target, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
+
+            rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
+            rnn_rmse = torch.sqrt(self.prop_criterion(denormalsied_output, curr_rnn_prop_target))
+            # print(output)
+            # print(loss)
+
+            # print("Estimation loss")
+            # print(denormalsied_target)
+            # print("Denormalised output")
+            # print(denormalsied_output)
+            # print(rnn_rmse)
+
+            prop_estimator_output = {
+                "rnn_loss": rnn_loss, 
+                "rnn_rmse": rnn_rmse, 
+                "normalized_output": normalized_output, 
+                "denormalsied_output": denormalsied_output,
+                "denormalsied_target": denormalsied_target
+            }
+        else:
+            prop_estimator_output = {
+                "rnn_loss": 0.0, 
+                "rnn_rmse": 0.0, 
+                "normalized_output": None, 
+                "denormalsied_output": None,
+                "denormalsied_target": None
+            }
+
         rnn = {"rnn": self._rnn_initial_states["policy"]} if self._rnn else {}
 
         # sample random actions
@@ -396,11 +430,6 @@ class PPO_RNN_PROP(Agent):
         # print(self._state_preprocessor)
         # print(self._state_preprocessor(states)[0,0])
         # print(states[0,0]) 
-
-        # print("act shapeeeee")
-        # print(self._state_preprocessor(states).shape)
-
-        # print("Agent act called")
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 
@@ -466,14 +495,36 @@ class PPO_RNN_PROP(Agent):
                     rnn_states.update({f"rnn_value_{i}": s.transpose(0, 1) for i, s in enumerate(self._rnn_initial_states["value"])})
 
             # storage transition in memory
-            # print("Check add sampleessss")
-            # print(states.shape)
-            # print(actions.shape)
-            # print(rnn_states.keys())
-            # print(rnn_states["rnn_policy_0"].shape)
-            # print(rnn_states["rnn_policy_1"].shape)
-            # print(rnn_states["rnn_value_0"].shape)
-            # print(rnn_states["rnn_value_1"].shape)
+            # print("Check memory initialisationnnn")
+            # print(self.memory.get_tensor_names())
+            # print("States Tensor Shape:", self.memory.get_tensor_by_name("states").shape)
+            # print("actions Tensor Shape:", self.memory.get_tensor_by_name("actions").shape)
+            # print("advantages Tensor Shape:", self.memory.get_tensor_by_name("advantages").shape)
+            # print("log_prob Tensor Shape:", self.memory.get_tensor_by_name("log_prob").shape)
+            # print("returns Tensor Shape:", self.memory.get_tensor_by_name("returns").shape)
+            # print("rewards Tensor Shape:", self.memory.get_tensor_by_name("rewards").shape)
+            # print("rnn_policy_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_0").shape)
+            # print("rnn_policy_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_policy_1").shape)
+            # print("rnn_value_0 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_0").shape)
+            # print("rnn_value_1 Tensor Shape:", self.memory.get_tensor_by_name("rnn_value_1").shape)
+            # print("terminated Tensor Shape:", self.memory.get_tensor_by_name("terminated").shape)
+            # print("values Tensor Shape:", self.memory.get_tensor_by_name("values").shape)
+
+            # print("States Tensor Shape:", states.shape)
+            # print("actions Tensor Shape:", actions.shape)
+            # # print("advantages Tensor Shape:", advantages.shape)
+            # print("log_prob Tensor Shape:", self._current_log_prob.shape)
+            # # print("returns Tensor Shape:", returns.shape)
+            # print("rewards Tensor Shape:", rewards.shape)
+            # print("rnn_policy_0 Tensor Shape:", rnn_states["rnn_policy_0"].shape)
+            # print("rnn_policy_1 Tensor Shape:", rnn_states["rnn_policy_1"].shape)
+            # print("rnn_value_1 Tensor Shape:", rnn_states["rnn_value_1"].shape)
+            # print("rnn_value_0 Tensor Shape:", rnn_states["rnn_value_0"].shape)
+            # print("terminated Tensor Shape:", terminated.shape)
+            # print("values Tensor Shape:", values.shape)
+
+            # values = values.reshape(-1,1)
+
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                     terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
             for memory in self.secondary_memories:
@@ -517,25 +568,14 @@ class PPO_RNN_PROP(Agent):
         if not self._rollout % self._rollouts and timestep >= self._learning_starts:
             self.set_mode("train")
             self._update(timestep, timesteps)
-            self.prop_model.train()
-            self._update_prop_estimator(timestep, timesteps)
-            self.prop_model.eval()
+            if self.success_rate > 0.0: 
+                self.prop_model.train()
+                self._update_prop_estimator(timestep, timesteps)
+                self.prop_model.eval()
             self.set_mode("eval")
 
         # write tracking data and checkpoints
         super().post_interaction(timestep, timesteps)
-
-        if timestep > 1 and self.checkpoint_interval > 0 and not timestep % self.checkpoint_interval:
-            import os
-            log_model_dir = os.path.join(self.experiment_dir, "checkpoints_prop", "LSTM_best.pth")
-            log_model_dir = os.path.join(self.experiment_dir, "checkpoints_prop")
-            if not os.path.exists(log_model_dir):
-                os.makedirs(log_model_dir)
-            best_model_path = log_model_dir + "/LSTM_best.pth"
-            torch.save(self.prop_model.to(self.device).state_dict(), best_model_path)
-
-            curr_model_path = log_model_dir + "/LSTM_"+str(timestep)+".pth"
-            torch.save(self.prop_model.to(self.device).state_dict(), curr_model_path)
 
     def _update(self, timestep: int, timesteps: int) -> None:
         """Algorithm's main update step
@@ -609,26 +649,11 @@ class PPO_RNN_PROP(Agent):
         self.memory.set_tensor_by_name("advantages", advantages)
 
         # sample mini-batches from memory
-        # print("Check mini batches")
-        # print(self._mini_batches)
-        # print(self._rnn_sequence_length)
         sampled_batches = self.memory.sample_all(names=self._tensors_names, mini_batches=self._mini_batches, sequence_length=self._rnn_sequence_length)
-            # print("Check sample batch shape")
-            # # first mini-batch = sampled_batches[0]
-            # curr_mini_batch = sampled_batches[0]
-            # curr_mini_batch_states = curr_mini_batch[0]
-            # print(curr_mini_batch_states.shape)
-        # import sys
-        # sys.exit(0)
 
         rnn_policy, rnn_value = {}, {}
         if self._rnn:
-            # print("Mini batch rnn")
-            # print(self._mini_batches)
-            # print(self._rnn_sequence_length)
             sampled_rnn_batches = self.memory.sample_all(names=self._rnn_tensors_names, mini_batches=self._mini_batches, sequence_length=self._rnn_sequence_length)
-            # print("RNN bacthess")
-            # print(sampled_rnn_batches[0][0].shape)
 
         cumulative_policy_loss = 0
         cumulative_entropy_loss = 0
@@ -639,18 +664,9 @@ class PPO_RNN_PROP(Agent):
             kl_divergences = []
 
             # mini-batches loop
-            # test_sample = sampled_batches[i][0]
-            # print(test_sample.shape)
             for i, (sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages) in enumerate(sampled_batches):
-                # print("Sampled states")
-                # print(sampled_states.shape)
-                # print(i)
-
-                import numpy as np
-                xpoints = np.arange(0, self._mini_batches) 
 
                 if self._rnn:
-                    # print("RNN enableddd!!")
                     if self.policy is self.value:
                         rnn_policy = {"rnn": [s.transpose(0, 1) for s in sampled_rnn_batches[i]], "terminated": sampled_dones}
                         rnn_value = rnn_policy
@@ -660,9 +676,6 @@ class PPO_RNN_PROP(Agent):
 
                 sampled_states = self._state_preprocessor(sampled_states, train=not epoch)
 
-                # print("update shapeeeee")
-                # print(sampled_states.shape)
-                # print("Agent update called")
                 _, next_log_prob, _ = self.policy.act({"states": sampled_states, "taken_actions": sampled_actions, **rnn_policy}, role="policy")
 
                 # compute approximate KL divergence
@@ -742,6 +755,7 @@ class PPO_RNN_PROP(Agent):
 
     
     def _update_prop_estimator(self, timestep: int, timesteps: int) -> None:
+        # self.prop_model.train()
         # print("Prop estimator update")
 
         # print(len(self.curr_rollout_rnn_target))
@@ -761,32 +775,6 @@ class PPO_RNN_PROP(Agent):
                 # print(self.curr_rollout_rnn_target[i].shape)
 
                 targets = self.curr_rollout_rnn_target[i]
-                
-                outputs = self.prop_model(rnn_input)
-
-                # mean_friction = 0.5
-                # weight = 1+ torch.abs(targets-mean_friction)
-                # loss = torch.mean(weight*(outputs-targets)**2)
-                
-                loss = self.prop_criterion(outputs, targets)
-                
-                # Backward pass and optimization
-                self.prop_optimizer.zero_grad()
-                loss.backward()
-                self.prop_optimizer.step()
-            
-            # print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-
-            # # Record average loss after each epoch to weights and biases
-            # wandb.log({"loss": loss.item()})
-
-
 
         self.curr_rollout_rnn_input = []
         self.curr_rollout_rnn_target = []
-
-        # rewards = self.memory.get_tensor_by_name("rewards")
-        # states = self.memory.get_tensor_by_name("states")
-
-        # print(rewards.shape)
-        # print(states.shape)

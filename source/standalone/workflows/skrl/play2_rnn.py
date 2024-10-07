@@ -20,6 +20,8 @@ from omni.isaac.lab.app import AppLauncher
 from datetime import datetime
 
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
+from source.skrl_custom.ppo_rnn_prop2 import PPO_RNN2
+
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
@@ -110,6 +112,7 @@ def main():
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
+    agent_cfg["prop_estimator"]["train"] = False
 
     agent = PPO_RNN_PROP(
         models=models,
@@ -171,8 +174,10 @@ def main():
             # env stepping
             obs, _, _, _, infos = env.step(actions)
             # print("Infos keys")
-            # print(infos.keys())
-            # print(prop_estimator_output.keys())
+            # # print(infos.keys())
+            # print(prop_estimator_output["rnn_rmse"])
+            # print(prop_estimator_output["rnn_loss"])
+            wandb.log({"rnn_rmse": prop_estimator_output["rnn_rmse"]})
             # print("Current episode")
             # print(env.episode_length_buf)
             # print("Groundtruth")

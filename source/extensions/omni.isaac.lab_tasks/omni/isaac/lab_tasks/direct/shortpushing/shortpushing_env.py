@@ -50,9 +50,9 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.3),
+          "dynamic_friction_range": (0.05, 0.95),
           "restitution_range": (1.0, 1.0),  # (1.0, 1.0),  
-          "com_rad": 0.032, 
+        #   "com_rad": 0.032, 
         #   "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),
         #   "com_range_y": (-0.01, 0.01), # (-0.02, 0.02),
         #   "com_range_z": (0.0, 0.0), 
@@ -237,10 +237,10 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = 1.0 #0.0
-        self.goal_location_max_x = 1.4 #0.75
-        self.goal_location_min_y = -0.2 #-0.3
-        self.goal_location_max_y = 0.2 #0.3
+        self.goal_location_min_x = 1.1 #0.0
+        self.goal_location_max_x = 1.3 #0.75
+        self.goal_location_min_y = -0.1 #-0.3
+        self.goal_location_max_y = 0.1 #0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
@@ -281,7 +281,7 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.past_puck_vel = [initial_vel_tensor]
 
         # Past state tracking for RNN prop estimation
-        self.past_timestep_prop = 5
+        self.past_timestep_prop = 15
         self.initial_pos_tensor_prop = torch.zeros(1, self.num_envs, len(self.state_pos_idx), device=self.scene.env_origins.device)
         self.past_pusher_pos_prop = [self.initial_pos_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
         self.past_puck_pos_prop = [self.initial_pos_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
@@ -289,6 +289,12 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.past_obs_prop = [self.initial_obs_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
         self.initial_action_tensor_prop = torch.zeros(1, self.num_envs, 2, device=self.scene.env_origins.device)
         self.past_action_prop = [self.initial_action_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
+
+        # self.initial_obs_tensor_prop = torch.full((1, self.num_envs, 5), torch.nan, device=self.scene.env_origins.device)
+        # self.past_obs_prop = [self.initial_obs_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
+
+        # self.initial_action_tensor_prop = torch.full((1, self.num_envs, 2), torch.nan, device=self.scene.env_origins.device)
+        # self.past_action_prop = [self.initial_action_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
 
         self.curriculum_count = 0
 
@@ -769,7 +775,9 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         selected_envs = env_ids.tolist()
         # print(selected_envs)
         for tensor in self.past_obs_prop:
-            tensor[0, selected_envs, :] = 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+            tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+        for tensor in self.past_action_prop:
+            tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
 
         # Reset goal
         # curr_success_rate = self.extras.get('log')

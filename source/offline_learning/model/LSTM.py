@@ -22,13 +22,7 @@ class LSTM(nn.Module):
         # Fully connected layer for final output
         self.fc = nn.Linear(self.hidden_num, self.output_num)
 
-    def forward(self, x, h_prev, c_prev, cell_init):
-
-        mask = cell_init == 1  # Shape: [64]
-
-        # Use the mask to index into prev_h and prev_c and zero out the terminated states
-        h_prev[:, mask, :] = 0
-        c_prev[:, mask, :] = 0
+    def forward(self, x, h_prev, c_prev):
 
         prev_cell = (h_prev.detach(), c_prev.detach())
         y_rnn, (h, c) = self.rnn(x, prev_cell)
