@@ -157,6 +157,7 @@ def main():
     agent_cfg["experiment"]["checkpoint_interval"] = 0  # don't generate checkpoints
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
+    agent_cfg["prop_estimator"]["train"] = False
 
     agent = PPO_RNN_PROP(
         models=models,

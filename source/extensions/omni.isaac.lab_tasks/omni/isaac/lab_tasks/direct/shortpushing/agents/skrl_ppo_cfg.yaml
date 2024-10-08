@@ -74,9 +74,9 @@ prop_estimator:
   hidden_size: 64    # Number of features in hidden state
   num_layers: 1      # Number of LSTM layers
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
-  learning_rate: 0.01
+  learning_rate: 0.001
   train: True
-  num_epochs: 8
+  num_epochs: 5
 
   position_index: [0,1,3,4]
   rotation_index: 2
@@ -98,12 +98,10 @@ prop_estimator:
   feature_target_min: -0.9
   feature_target_max: 0.9
 
-  fric_max: 0.95 # 1.0
+  fric_max: 0.3 # 1.0
   fric_min: 0.05 # 0.0
-  estimate_target_min: 0.1
+  estimate_target_min: -0.9
   estimate_target_max: 0.9
-
-
 
   # fric_min
 

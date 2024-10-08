@@ -20,7 +20,8 @@ class RNN(nn.Module):
         self.fc = nn.Linear(hidden_size, output_size)
 
         # Sigmoid activation for output normalization to [0, 1]
-        self.output_activation = nn.Sigmoid()
+        # self.output_activation = nn.Sigmoid()
+        self.output_activation = nn.Tanh()
     
     def forward(self, x):
         # Initialize hidden state
