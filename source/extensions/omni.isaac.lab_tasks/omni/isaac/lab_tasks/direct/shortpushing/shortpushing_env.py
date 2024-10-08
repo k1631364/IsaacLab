@@ -50,7 +50,7 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("cylinderpuck2"),
           "static_friction_range": (0.05, 0.05),
-          "dynamic_friction_range": (0.05, 0.95),
+          "dynamic_friction_range": (0.05, 0.3),
           "restitution_range": (1.0, 1.0),  # (1.0, 1.0),  
         #   "com_rad": 0.032, 
         #   "com_range_x": (-0.01, 0.01), # (-0.02, 0.02),

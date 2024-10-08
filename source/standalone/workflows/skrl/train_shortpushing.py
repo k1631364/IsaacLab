@@ -53,7 +53,6 @@ from datetime import datetime
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG #,PPO_RNN
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
 from source.skrl_custom.ppo_rnn import PPO_RNN
-from source.skrl_custom.ppo_rnn_prop2 import PPO_RNN2
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -66,7 +65,6 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlSequentialLogTrainer, SkrlVecEnvWrapper, process_skrl_cfg
 from omni.isaac.lab_tasks.utils.wrappers.skrl_rnn import SkrlSequentialLogTrainer_RNN #, SkrlVecEnvWrapper, process_skrl_cfg
-from omni.isaac.lab_tasks.utils.wrappers.skrl_prop import SkrlSequentialLogTrainer_Prop #, SkrlVecEnvWrapper, process_skrl_cfg
 
 # from source.offline_learning.model import RNNPropertyEstimator 
 # import source.offline_learning.model.RNNPropertyEstimator as rnnmodel
@@ -181,9 +179,8 @@ def main():
     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
-    agent_cfg["prop_estimator"]["train"] = True
 
-    agent = PPO_RNN_PROP(
+    agent = PPO_RNN(
         models=models,
         memory=memory,
         cfg=agent_cfg,
@@ -196,7 +193,7 @@ def main():
     # configure and instantiate a custom RL trainer for logging episode events
     # https://skrl.readthedocs.io/en/latest/api/trainers.html
     trainer_cfg = experiment_cfg["trainer"]
-    trainer = SkrlSequentialLogTrainer_RNN(cfg=trainer_cfg, env=env, agents=agent)
+    trainer = SkrlSequentialLogTrainer(cfg=trainer_cfg, env=env, agents=agent)
 
     print("Before expeirmnet start!!!!!!!!!!!!!!!!!!!!!!!")
     print("Log dir")

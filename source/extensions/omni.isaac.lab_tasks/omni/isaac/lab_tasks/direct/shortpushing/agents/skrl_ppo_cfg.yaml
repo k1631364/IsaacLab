@@ -76,7 +76,7 @@ prop_estimator:
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
   learning_rate: 0.01
   train: True
-  num_epochs: 5
+  num_epochs: 8
 
   position_index: [0,1,3,4]
   rotation_index: 2

@@ -196,7 +196,7 @@ class PPO_RNN_PROP(Agent):
         num_layers = self.cfg["prop_estimator"]["num_layers"]      # Number of LSTM layers
         output_size = self.cfg["prop_estimator"]["output_size"]     # Number of physical properties (e.g., friction, CoM)
         self.num_epochs = self.cfg["prop_estimator"]["num_epochs"]
-        learning_rate = self.cfg["prop_estimator"]["learning_rate"]
+        prop_learning_rate = self.cfg["prop_estimator"]["learning_rate"]
         self.position_index = self.cfg["prop_estimator"]["position_index"]
         self.rotation_index = self.cfg["prop_estimator"]["rotation_index"]
         self.velocity_index = self.cfg["prop_estimator"]["velocity_index"]
@@ -218,7 +218,7 @@ class PPO_RNN_PROP(Agent):
 
         self.prop_model = rnnmodel.RNN(input_size, hidden_size, num_layers, output_size).to(self.device)
         self.prop_criterion = nn.MSELoss()
-        self.prop_optimizer = optim.Adam(self.prop_model.parameters(), lr=learning_rate)
+        self.prop_optimizer = optim.Adam(self.prop_model.parameters(), lr=prop_learning_rate)
 
         if self.cfg["prop_estimator"]["train"]: 
             self.prop_model.train()
@@ -346,11 +346,11 @@ class PPO_RNN_PROP(Agent):
         denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
         denormalsied_target = denormalize(normalized_curr_rnn_prop_target, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
 
-        # mean_friction = 0.5
-        # weight = 1+ torch.abs(normalized_curr_rnn_prop_target-mean_friction)
-        # rnn_loss = torch.mean(weight*(normalized_output-normalized_curr_rnn_prop_target)**2)
+        mean_friction = 0.175
+        weight = 1+ torch.abs(normalized_curr_rnn_prop_target-mean_friction)
+        rnn_loss = torch.mean(weight*(normalized_output-normalized_curr_rnn_prop_target)**2)
         
-        rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
+        # rnn_loss = self.prop_criterion(normalized_output, normalized_curr_rnn_prop_target)
         rnn_rmse = torch.sqrt(self.prop_criterion(denormalsied_output, curr_rnn_prop_target))
         # print(output)
         # print(loss)
@@ -764,11 +764,11 @@ class PPO_RNN_PROP(Agent):
                 
                 outputs = self.prop_model(rnn_input)
 
-                # mean_friction = 0.5
-                # weight = 1+ torch.abs(targets-mean_friction)
-                # loss = torch.mean(weight*(outputs-targets)**2)
+                mean_friction = 0.175
+                weight = 1+ torch.abs(targets-mean_friction)
+                loss = torch.mean(weight*(outputs-targets)**2)
                 
-                loss = self.prop_criterion(outputs, targets)
+                # loss = self.prop_criterion(outputs, targets)
                 
                 # Backward pass and optimization
                 self.prop_optimizer.zero_grad()
