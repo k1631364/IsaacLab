@@ -183,6 +183,8 @@ class DirectRLEnvFeedback(DirectRLEnv):
         # print the environment information
         print("[INFO]: Completed setting up the environment...")
 
+        self.prop_info = None
+
     def __del__(self):
         """Cleanup for the environment."""
         self.close()
@@ -261,6 +263,11 @@ class DirectRLEnvFeedback(DirectRLEnv):
 
         # return observations
         return obs, self.extras
+
+    def _get_estimation(self, prop_info: dict) -> None: 
+        # print("Get estimation")
+        # print(prop_info)
+        self.prop_info = prop_info
 
     def step(self, action: torch.Tensor) -> VecEnvStepReturn:
         """Execute one time-step of the environment's dynamics.

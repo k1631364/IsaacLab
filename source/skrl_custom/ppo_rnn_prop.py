@@ -230,6 +230,11 @@ class PPO_RNN_PROP(Agent):
             self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
             print("Load prop model")
 
+        # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"   # short pushing
+        trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
+        self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
+        print("Load prop model")
+
         self.prop_model.eval()
 
         self.curr_rollout_rnn_input = []
@@ -356,10 +361,10 @@ class PPO_RNN_PROP(Agent):
         # print(output)
         # print(loss)
 
-        print("Estimation loss")
-        print(denormalsied_target)
-        print("Denormalised output")
-        print(denormalsied_output)
+        # print("Estimation loss")
+        # print(denormalsied_target)
+        # print("Denormalised output")
+        # print(denormalsied_output)
         # print("Normalised output")
         # print(normalized_output)
         # print(rnn_rmse)
