@@ -102,7 +102,7 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.032
-    puck_default_pos = 1.2
+    puck_default_pos = 1.35
     cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cylinderpuck2",
         spawn=sim_utils.CylinderCfg(
@@ -118,7 +118,7 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
     )
 
     pusher_length = 0.013
-    pusher_default_pos = 1.3
+    pusher_default_pos = 1.45
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.SphereCfg(
@@ -229,7 +229,7 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
 
         self.goal_length = self.cfg.goal_length
-        self.success_threshold = 0.2
+        self.success_threshold = 0.85
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         self.goal_threshold = self.cfg.goal_length
@@ -237,10 +237,10 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = 1.1 #0.0
-        self.goal_location_max_x = 1.3 #0.75
-        self.goal_location_min_y = -0.1 #-0.3
-        self.goal_location_max_y = 0.1 #0.3
+        self.goal_location_min_x = 1.05 # 1.15 #0.0
+        self.goal_location_max_x = 1.55 # 1.55 #0.75
+        self.goal_location_min_y = -0.3 # -0.2 #-0.3
+        self.goal_location_max_y = 0.3 # 0.2 #0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
@@ -629,6 +629,29 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         
         return observations
 
+    def _get_estimation(self, prop_info: dict) -> None:
+        # Call the parent class's _get_estimation method
+        super()._get_estimation(prop_info)
+        
+        # prop info
+        # print("Prop info")
+        # print(self.prop_info)
+        self.rnn_rmse = self.prop_info["prop_estimator_output"]["rnn_rmse"]
+        self.denormalsied_output = self.prop_info["prop_estimator_output"]["denormalsied_output"]
+        self.denormalsied_target = self.prop_info["prop_estimator_output"]["denormalsied_target"]
+        # print("rmse")
+        # print(self.rnn_rmse)
+        # print(self.denormalsied_output.shape)
+        # print(self.denormalsied_target.shape)
+        # print(self.denormalsied_output)
+        # print(self.denormalsied_target)
+        # print(self.groundtruth_prop)
+        squared_error = (self.denormalsied_output - self.denormalsied_target) ** 2
+        self.prop_rmse_eachenv = torch.sqrt(squared_error).squeeze() 
+
+        # print(prop_rmse_eachenv)
+
+
     def _get_rewards(self) -> torch.Tensor:
         # print("Env get rewards called!!!!")
 
@@ -671,7 +694,8 @@ class ShortPushingEnv(DirectRLEnvFeedback):
             curr_cuboidpusher2_state[:, 7], 
             self.episode_failed,
             self.goal_bounds, 
-            normalized_goal_tensor
+            normalized_goal_tensor, 
+            self.prop_rmse_eachenv
         )
         return total_reward
         # pass
@@ -702,11 +726,11 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         curr_cylinderpuck2_state[:, 0:3] = (
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )        
-        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_puck_posx
-        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_puck_posx
+        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_pusher_posx
+        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_pusher_posx
 
-        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_puck_posy
-        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_puck_posy
+        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_pusher_posy
+        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_pusher_posy
 
         out_of_bounds_max_puck_pos = out_of_bounds_max_puck_posx | out_of_bounds_max_puck_posy
         out_of_bounds_min_puck_pos = out_of_bounds_min_puck_posx | out_of_bounds_min_puck_posy
@@ -724,20 +748,20 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Check if puch reached goal
         euclid_distance = torch.norm(curr_cylinderpuck2_state[:,[0, 1]] - self.goal_locations[:,[0,1]], dim=1)
 
-        # # Curriculum goal
-        # curr_success_rate = self.extras.get('log')
-        # if curr_success_rate is not None: 
-        #     # print(curr_success_rate["success_rate"])  
-        #     if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
-        #         self.goal_threshold -= 0.05
-        #         print(self.goal_threshold)
-        #         # self.rew_scale_goal += 5
-        #         # self.success_threshold += 0.1
-        #         # self.goal_length -= 0.1 
-        #         self.curriculum_count = 0
-        #         pass
-        #     else:
-        #         self.curriculum_count+=1
+        # Curriculum goal
+        curr_success_rate = self.extras.get('log')
+        if curr_success_rate is not None: 
+            # print(curr_success_rate["success_rate"])  
+            if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.02 and self.curriculum_count>self.max_episode_length: 
+                self.goal_threshold -= 0.01
+                print(self.goal_threshold)
+                # self.rew_scale_goal += 5
+                # self.success_threshold += 0.1
+                # self.goal_length -= 0.1 
+                self.curriculum_count = 0
+                # pass
+            else:
+                self.curriculum_count+=1
 
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
 
@@ -861,6 +885,7 @@ def compute_rewards(
     reset_terminated: torch.Tensor,
     goal_bounds: torch.Tensor, 
     goal_locations: torch.Tensor, 
+    rmse: torch.Tensor, 
 ):
 
     # Positive reward for reaching goal
@@ -870,6 +895,10 @@ def compute_rewards(
     # Negative reward for failed episode
     rew_termination = rew_scale_terminated * reset_terminated.float()
 
-    total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    rew_scale_props_estimate = -1.0
+    rew_prop_estimate = rew_scale_props_estimate * rmse.float()
+
+    # total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    total_reward = rew_goal + rew_termination + rew_prop_estimate # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
 
     return total_reward

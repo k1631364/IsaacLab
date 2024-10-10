@@ -224,14 +224,16 @@ class PPO_RNN_PROP(Agent):
             self.prop_model.train()
             print("Train prop model from scratchs")
         else: 
-            self.prop_model.eval()
-            # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-07_22-26-19/checkpoints_prop/LSTM_best.pth"
-            trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"
-            self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
-            print("Load prop model")
+            # self.prop_model.eval()
+            # # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-07_22-26-19/checkpoints_prop/LSTM_best.pth"
+            # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"
+            # self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
+            # print("Load prop model")
+            pass
 
         # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"   # short pushing
-        trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
+        # trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
+        trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-10_13-53-39/checkpoints_prop/LSTM_best.pth"
         self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
         print("Load prop model")
 

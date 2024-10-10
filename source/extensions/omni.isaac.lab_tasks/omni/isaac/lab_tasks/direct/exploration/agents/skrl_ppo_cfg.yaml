@@ -35,7 +35,7 @@ models:
 # PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
 # https://skrl.readthedocs.io/en/latest/api/agents/ppo.html
 agent:
-  rollouts: 16
+  rollouts: 32
   learning_epochs: 8
   mini_batches: 8
   discount_factor: 0.99

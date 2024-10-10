@@ -102,7 +102,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
 
     # Puck
     puck_length = 0.032
-    puck_default_pos = 1.2
+    puck_default_pos = 1.35
     cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cylinderpuck2",
         spawn=sim_utils.CylinderCfg(
@@ -118,7 +118,7 @@ class ExplorationEnvCfg(DirectRLEnvCfg):
     )
 
     pusher_length = 0.013
-    pusher_default_pos = 1.3
+    pusher_default_pos = 1.45
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
         spawn=sim_utils.SphereCfg(
@@ -245,10 +245,10 @@ class ExplorationEnv(DirectRLEnvFeedback):
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = 1.1 #0.0
-        self.goal_location_max_x = 1.3 #0.75
-        self.goal_location_min_y = -0.1 #-0.3
-        self.goal_location_max_y = 0.1 #0.3
+        self.goal_location_min_x = 1.05 # 1.15 #0.0
+        self.goal_location_max_x = 1.55 # 1.55 #0.75
+        self.goal_location_min_y = -0.3 # -0.2 #-0.3
+        self.goal_location_max_y = 0.3 # 0.2 #0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
@@ -758,11 +758,11 @@ class ExplorationEnv(DirectRLEnvFeedback):
         curr_cylinderpuck2_state[:, 0:3] = (
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )        
-        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_puck_posx
-        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_puck_posx
+        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_pusher_posx
+        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_pusher_posx
 
-        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_puck_posy
-        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_puck_posy
+        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_pusher_posy
+        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_pusher_posy
 
         out_of_bounds_max_puck_pos = out_of_bounds_max_puck_posx | out_of_bounds_max_puck_posy
         out_of_bounds_min_puck_pos = out_of_bounds_min_puck_posx | out_of_bounds_min_puck_posy
