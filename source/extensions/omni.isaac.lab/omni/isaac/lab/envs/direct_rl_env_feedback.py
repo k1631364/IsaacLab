@@ -159,6 +159,7 @@ class DirectRLEnvFeedback(DirectRLEnv):
         self.goal_reached = torch.zeros_like(self.reset_terminated)
         self.episode_failed = torch.zeros_like(self.reset_terminated)
         self.success_record = torch.zeros_like(self.reset_terminated)
+        self.end_rmse_record = torch.zeros_like(self.reset_terminated)
         self.num_success = 0
         self.num_failure = 0
         self.reset_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.sim.device)
@@ -310,7 +311,7 @@ class DirectRLEnvFeedback(DirectRLEnv):
         self.episode_length_buf += 1  # step in current episode (per env)
         self.common_step_counter += 1  # total step (common for all envs)
 
-        self.reset_terminated[:], self.reset_time_outs[:], self.goal_reached[:], self.episode_failed[:] = self._get_dones()
+        self.reset_terminated[:], self.reset_time_outs[:], self.goal_reached[:], self.episode_failed[:], done_info = self._get_dones()
         self.reset_buf = self.reset_terminated | self.reset_time_outs
         self.reward_buf = self._get_rewards()
 
@@ -345,6 +346,12 @@ class DirectRLEnvFeedback(DirectRLEnv):
         # Update record_tensor based on success_tensor and failed_tensor
         self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
         self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
+
+        curr_rmse = done_info["curr_rmse"]
+        print(curr_rmse.shape)
+        end_tensor = success_tensor | failed_tensor
+        print(end_tensor.shape)
+        # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
 
         # print(success_tensor.shape)
         if success_tensor[0]==True:

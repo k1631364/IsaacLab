@@ -832,7 +832,11 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
 
         episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out | out_of_bounds_min_puck_velx
 
-        return out_of_bounds, time_out, self.goal_bounds, episode_failed
+        done_info = {
+            "curr_rmse": self.prop_rmse_eachenv
+        }
+
+        return out_of_bounds, time_out, self.goal_bounds, episode_failed, done_info
         # return false_tensor, time_out, self.goal_bounds, episode_failed
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
