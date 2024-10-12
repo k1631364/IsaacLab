@@ -196,7 +196,7 @@ class ExplorationCombinedEnvCfg(DirectRLEnvCfg):
     rew_scale_goal = 30.0
     rew_scale_timestep = 0.001
     rew_scale_pushervel = -0.1
-    rew_scale_props_estimate = -1.0
+    rew_scale_props_estimate = -10.0
     rew_scale_goal_pushing = 30.0
     rew_scale_goal_exp = 30.0
 
@@ -243,6 +243,7 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         self.prop_estimate_threshold = 0.05
         self.max_estimation_goalcount = self.cfg.max_estimation_goalcount
         self.rew_scale_goal_pushing = self.cfg.rew_scale_goal_pushing
+        self.rew_scale_goal_exp = self.cfg.rew_scale_goal_exp
         
         # Goal randomisation range
         self.goal_location_min = 0.25
@@ -713,7 +714,7 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
             self.cfg.rew_scale_pushervel, 
             self.cfg.rew_scale_props_estimate, 
             self.rew_scale_goal_pushing, 
-            self.cfg.rew_scale_goal_exp, 
+            self.rew_scale_goal_exp, 
             normalised_curr_distance, 
             curr_cuboidpusher2_state[:, 7], 
             self.episode_failed,
@@ -793,7 +794,7 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         if curr_success_rate is not None: 
             # print(curr_success_rate["success_rate"])  
             if curr_success_rate["success_rate"] > 0.5 and self.rew_scale_goal_pushing > 0.02 and self.curriculum_count>self.max_episode_length: 
-                self.rew_scale_goal_pushing -= 1.0
+                self.rew_scale_goal_pushing -= 30.0
                 print(self.rew_scale_goal_pushing)
                 # self.rew_scale_goal += 5
                 # self.success_threshold += 0.1
@@ -961,5 +962,6 @@ def compute_rewards(
     # total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
     # total_reward = rew_goal + rew_termination + rew_prop_estimate # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
     total_reward = rew_goal_pushing + rew_goal_exp + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    # total_reward = rew_goal_pushing + rew_prop_estimate + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
 
     return total_reward
