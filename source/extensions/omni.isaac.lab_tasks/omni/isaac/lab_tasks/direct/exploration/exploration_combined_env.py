@@ -62,7 +62,7 @@ class EventCfg:
   )
 
 @configclass
-class ShortPushingEnvCfg(DirectRLEnvCfg):
+class ExplorationCombinedEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -188,6 +188,7 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
     min_puck_posy = -0.5  # the cart is reset if it exceeds that position [m]
     min_puck_velx = 0.01
     max_puck_restcount = 10
+    max_estimation_goalcount = 5
     
     # reward scales
     rew_scale_terminated = -15.0
@@ -196,11 +197,13 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
     rew_scale_timestep = 0.001
     rew_scale_pushervel = -0.1
     rew_scale_props_estimate = -1.0
+    rew_scale_goal_pushing = 30.0
+    rew_scale_goal_exp = 30.0
 
-class ShortPushingEnv(DirectRLEnvFeedback):
-    cfg: ShortPushingEnvCfg
+class ExplorationCombinedEnv(DirectRLEnvFeedback):
+    cfg: ExplorationCombinedEnvCfg
 
-    def __init__(self, cfg: ShortPushingEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: ExplorationCombinedEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
 
@@ -216,6 +219,7 @@ class ShortPushingEnv(DirectRLEnvFeedback):
 
         # Out of bound counter: goal puck (puck in goal)
         self.out_of_bounds_goal_puck_posx_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
+        self.out_of_bounds_goal_prop_estimate_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
 
         # Recent episode success/failure tracking (1: success, 0: failure)
         self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
@@ -234,6 +238,11 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         self.goal_threshold = self.cfg.goal_length
+
+        # property estimation goal
+        self.prop_estimate_threshold = 0.05
+        self.max_estimation_goalcount = self.cfg.max_estimation_goalcount
+        self.rew_scale_goal_pushing = self.cfg.rew_scale_goal_pushing
         
         # Goal randomisation range
         self.goal_location_min = 0.25
@@ -703,12 +712,16 @@ class ShortPushingEnv(DirectRLEnvFeedback):
             self.cfg.rew_scale_timestep, 
             self.cfg.rew_scale_pushervel, 
             self.cfg.rew_scale_props_estimate, 
+            self.rew_scale_goal_pushing, 
+            self.cfg.rew_scale_goal_exp, 
             normalised_curr_distance, 
             curr_cuboidpusher2_state[:, 7], 
             self.episode_failed,
             self.goal_bounds, 
             normalized_goal_tensor, 
-            self.prop_rmse_eachenv
+            self.prop_rmse_eachenv, 
+            self.goal_bounds_pushing, 
+            self.goal_bounds_exp
         )
         return total_reward
         # pass
@@ -776,13 +789,39 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         #     else:
         #         self.curriculum_count+=1
 
+        curr_success_rate = self.extras.get('log')
+        if curr_success_rate is not None: 
+            # print(curr_success_rate["success_rate"])  
+            if curr_success_rate["success_rate"] > 0.5 and self.rew_scale_goal_pushing > 0.02 and self.curriculum_count>self.max_episode_length: 
+                self.rew_scale_goal_pushing -= 1.0
+                print(self.rew_scale_goal_pushing)
+                # self.rew_scale_goal += 5
+                # self.success_threshold += 0.1
+                # self.goal_length -= 0.1 
+                self.curriculum_count = 0
+                # pass
+            else:
+                self.curriculum_count+=1
+
+        # Goal for pushing
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
 
         self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
 
-        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
+        self.goal_bounds_pushing = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
+
+        # Goal for exploration
+        curr_out_of_bounds_goal_prop_estimate_count = self.prop_rmse_eachenv < self.prop_estimate_threshold
+
+        self.out_of_bounds_goal_prop_estimate_count+= curr_out_of_bounds_goal_prop_estimate_count.int()
+
+        self.goal_bounds_exp = self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount
+        self.out_of_bounds_goal_prop_estimate_count[self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount] = 0
+        self.out_of_bounds_goal_prop_estimate_count[~curr_out_of_bounds_goal_prop_estimate_count] = 0
+
+        self.goal_bounds = self.goal_bounds_exp
 
         out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
         time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -894,24 +933,33 @@ def compute_rewards(
     rew_scale_timestep: float, 
     rew_scale_pushervel: float, 
     rew_scale_props_estimate: float, 
+    rew_scale_goal_pushing: float, 
+    rew_scale_goal_exp: float, 
     normalised_curr_distance: torch.Tensor,
     curr_vel: torch.Tensor,  
     reset_terminated: torch.Tensor,
     goal_bounds: torch.Tensor, 
     goal_locations: torch.Tensor, 
     rmse: torch.Tensor, 
+    goal_bounds_pushing, 
+    goal_bounds_exp
 ):
 
     # Positive reward for reaching goal
-    rew_goal = rew_scale_goal * goal_bounds.int() 
+    # rew_goal = rew_scale_goal * goal_bounds_pushing.int() 
+    # rew_goal = rew_scale_goal * goal_bounds.int()
     # rew_goal = rew_scale_goal * goal_bounds.int() * (1.0 - normalised_curr_distance)
-    
+
+    rew_goal_pushing = rew_scale_goal_pushing * goal_bounds_pushing.int() 
+    rew_goal_exp = rew_scale_goal_exp * goal_bounds_exp.int() 
+
     # Negative reward for failed episode
     rew_termination = rew_scale_terminated * reset_terminated.float()
 
     rew_prop_estimate = rew_scale_props_estimate * rmse.float()
 
-    total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    # total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
     # total_reward = rew_goal + rew_termination + rew_prop_estimate # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    total_reward = rew_goal_pushing + rew_goal_exp + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
 
     return total_reward

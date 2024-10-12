@@ -758,11 +758,11 @@ class ExplorationEnv(DirectRLEnvFeedback):
         curr_cylinderpuck2_state[:, 0:3] = (
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )        
-        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_pusher_posx
-        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_pusher_posx
+        out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_puck_posx
+        out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_puck_posx
 
-        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_pusher_posy
-        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_pusher_posy
+        out_of_bounds_max_puck_posy = curr_cylinderpuck2_state[:,1] > self.cfg.max_puck_posy
+        out_of_bounds_min_puck_posy = curr_cylinderpuck2_state[:,1] < self.cfg.min_puck_posy
 
         out_of_bounds_max_puck_pos = out_of_bounds_max_puck_posx | out_of_bounds_max_puck_posy
         out_of_bounds_min_puck_pos = out_of_bounds_min_puck_posx | out_of_bounds_min_puck_posy
@@ -797,6 +797,7 @@ class ExplorationEnv(DirectRLEnvFeedback):
         #         pass
         #     else:
         #         self.curriculum_count+=1
+        
 
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
         curr_out_of_bounds_goal_prop_estimate_count = self.prop_rmse_eachenv < self.prop_estimate_threshold

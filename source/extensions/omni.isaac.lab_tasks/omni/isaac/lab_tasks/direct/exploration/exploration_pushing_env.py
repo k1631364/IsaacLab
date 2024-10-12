@@ -62,7 +62,7 @@ class EventCfg:
   )
 
 @configclass
-class ShortPushingEnvCfg(DirectRLEnvCfg):
+class ExplorationPushingEnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -139,6 +139,8 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
     goal_length = 0.05
     max_puck_goalcount = 10
 
+    max_estimation_goalcount = 3
+
     markergoal1_cfg = VisualizationMarkersCfg(
         prim_path="/Visual/Start1",
         markers={
@@ -195,12 +197,12 @@ class ShortPushingEnvCfg(DirectRLEnvCfg):
     rew_scale_goal = 30.0
     rew_scale_timestep = 0.001
     rew_scale_pushervel = -0.1
-    rew_scale_props_estimate = -1.0
+    rew_scale_props_estimate = -10.0
 
-class ShortPushingEnv(DirectRLEnvFeedback):
-    cfg: ShortPushingEnvCfg
+class ExplorationPushingEnv(DirectRLEnvFeedback):
+    cfg: ExplorationPushingEnvCfg
 
-    def __init__(self, cfg: ShortPushingEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: ExplorationPushingEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
 
@@ -217,6 +219,9 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Out of bound counter: goal puck (puck in goal)
         self.out_of_bounds_goal_puck_posx_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
 
+        # Out of bound counter: goal prop estimate (low prop estimate error)
+        self.out_of_bounds_goal_prop_estimate_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
+
         # Recent episode success/failure tracking (1: success, 0: failure)
         self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
         # self.inside_goal = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
@@ -230,18 +235,20 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.goal_locations = init_goal_location.repeat(self.scene.env_origins.shape[0], 1)
 
         self.goal_length = self.cfg.goal_length
-        self.success_threshold = 0.85
+        self.success_threshold = 0.2
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         self.goal_threshold = self.cfg.goal_length
         
+        self.prop_estimate_threshold = 0.05
+        
         # Goal randomisation range
         self.goal_location_min = 0.25
         self.goal_location_max = 0.75
-        self.goal_location_min_x = 1.2 # 1.05 # 1.15 #0.0
-        self.goal_location_max_x = 1.4 # 1.55 # 1.55 #0.75
-        self.goal_location_min_y = -0.1 # -0.3 # -0.2 #-0.3
-        self.goal_location_max_y = 0.1 # 0.3 # 0.2 #0.3
+        self.goal_location_min_x = 1.05 # 1.15 #0.0
+        self.goal_location_max_x = 1.55 # 1.55 #0.75
+        self.goal_location_min_y = -0.3 # -0.2 #-0.3
+        self.goal_location_max_y = 0.3 # 0.2 #0.3
         self.discrete_goals = torch.tensor([0.75, 0.5, 0.25, 0.0], device=self.device)
         self.discrete_goals_x = torch.tensor([0.5, 0.7, 0.9], device=self.device)    # Nearby goals: [0.7, 0.9]
         self.discrete_goals_y = torch.tensor([0.1, -0.1], device=self.device)   # Nearby goals: [0.1, -0.1]
@@ -299,13 +306,6 @@ class ShortPushingEnv(DirectRLEnvFeedback):
 
         self.curriculum_count = 0
 
-        self.rnn_rmse_threshold = 0.06
-        # self.rew_scale_props_estimate = self.cfg.rew_scale_props_estimate
-        self.rnn_rmse = None
-        self.denormalsied_output = None
-        self.denormalsied_target = None
-        self.prop_rmse_eachenv = None
-
         # ### Prop estimation (offline) ###
 
         # # Load the learnt model info
@@ -346,6 +346,9 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Episodic noises
         self.obs_pos_noise_epi = torch.normal(self.cfg.obs_pos_noise_mean, self.cfg.obs_pos_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
         self.obs_vel_noise_epi = torch.normal(self.cfg.obs_vel_noise_mean, self.cfg.obs_vel_noise_std, size=(self.scene.env_origins.shape[0],1)).to(self.scene.env_origins.device)
+
+        # prop info
+        self.groundtruth_prop = None
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -597,10 +600,6 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         
         # normalized_estimated_prop_rl = (denormalsied_estimated_prop - dynamic_frictions_min) / (dynamic_frictions_max - dynamic_frictions_min)
 
-        # print("Estimated properties")
-        # print(self.denormalsied_output)
-        # print(self.denormalsied_target)
-        # print(self.prop_rmse_eachenv)
 
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), norma        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)lized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
@@ -632,6 +631,9 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         #     "com_y": com_y.view(-1,1), 
         # }
         groundtruth_prop = torch.cat((dynamic_frictions.view(-1,1), com_x.view(-1,1), com_y.view(-1,1)), dim=1)
+        
+        self.groundtruth_prop = groundtruth_prop
+
         observations = {"policy": obs, 
                         "prop": groundtruth_prop, 
                         "rnn_input": online_rnn_prop_input}
@@ -662,7 +664,6 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         self.prop_rmse_eachenv = torch.sqrt(squared_error).squeeze() 
 
         # print(prop_rmse_eachenv)
-
 
     def _get_rewards(self) -> torch.Tensor:
         # print("Env get rewards called!!!!")
@@ -695,6 +696,24 @@ class ShortPushingEnv(DirectRLEnvFeedback):
         # Jerk
         jerk = (acc-self.prev_puck_acc)/control_dt
         self.prev_puck_acc = acc.clone()
+
+        # # prop info
+        # # print("Prop info")
+        # # print(self.prop_info)
+        # self.rnn_rmse = self.prop_info["prop_estimator_output"]["rnn_rmse"]
+        # self.denormalsied_output = self.prop_info["prop_estimator_output"]["denormalsied_output"]
+        # self.denormalsied_target = self.prop_info["prop_estimator_output"]["denormalsied_target"]
+        # # print("rmse")
+        # # print(self.rnn_rmse)
+        # # print(self.denormalsied_output.shape)
+        # # print(self.denormalsied_target.shape)
+        # # print(self.denormalsied_output)
+        # # print(self.denormalsied_target)
+        # # print(self.groundtruth_prop)
+        # squared_error = (self.denormalsied_output - self.denormalsied_target) ** 2
+        # prop_rmse_eachenv = torch.sqrt(squared_error).squeeze() 
+
+        # # print(prop_rmse_eachenv)
 
         total_reward = compute_rewards(
             self.cfg.rew_scale_terminated,
@@ -760,29 +779,34 @@ class ShortPushingEnv(DirectRLEnvFeedback):
 
         # Check if puch reached goal
         euclid_distance = torch.norm(curr_cylinderpuck2_state[:,[0, 1]] - self.goal_locations[:,[0,1]], dim=1)
+        # print("Check goal conditions")
+        # print(euclid_distance)
+        # print(self.prop_rmse_eachenv)
 
         # # Curriculum goal
         # curr_success_rate = self.extras.get('log')
         # if curr_success_rate is not None: 
         #     # print(curr_success_rate["success_rate"])  
-        #     if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.02 and self.curriculum_count>self.max_episode_length: 
-        #         self.goal_threshold -= 0.01
+        #     if curr_success_rate["success_rate"] > self.success_threshold and self.goal_threshold > 0.11 and self.curriculum_count>self.max_episode_length: 
+        #         self.goal_threshold -= 0.05
         #         print(self.goal_threshold)
         #         # self.rew_scale_goal += 5
         #         # self.success_threshold += 0.1
         #         # self.goal_length -= 0.1 
         #         self.curriculum_count = 0
-        #         # pass
+        #         pass
         #     else:
         #         self.curriculum_count+=1
+        
 
-        curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
+        # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
+        curr_out_of_bounds_goal_prop_estimate_count = self.prop_rmse_eachenv < self.prop_estimate_threshold
 
-        self.out_of_bounds_goal_puck_posx_count+= curr_out_of_bounds_goal_puck_posx_count.int()
+        self.out_of_bounds_goal_prop_estimate_count+= curr_out_of_bounds_goal_prop_estimate_count.int()
 
-        self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
-        self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
-        self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
+        self.goal_bounds = self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount
+        self.out_of_bounds_goal_prop_estimate_count[self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount] = 0
+        self.out_of_bounds_goal_prop_estimate_count[~curr_out_of_bounds_goal_prop_estimate_count] = 0
 
         out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
         time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -909,9 +933,16 @@ def compute_rewards(
     # Negative reward for failed episode
     rew_termination = rew_scale_terminated * reset_terminated.float()
 
+    # print("Reward shape")
+    # print(goal_bounds.int().shape)
+    # print(reset_terminated.float().shape)
+    # print(rmse)
+
     rew_prop_estimate = rew_scale_props_estimate * rmse.float()
 
+    # print(rew_prop_estimate)
+
     total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
-    # total_reward = rew_goal + rew_termination + rew_prop_estimate # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+    # total_reward = rew_prop_estimate + rew_termination
 
     return total_reward

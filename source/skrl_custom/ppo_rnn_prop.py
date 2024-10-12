@@ -233,7 +233,10 @@ class PPO_RNN_PROP(Agent):
 
         # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"   # short pushing
         # trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
-        trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-10_13-53-39/checkpoints_prop/LSTM_best.pth"
+        # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-10_13-53-39/checkpoints_prop/LSTM_best.pth"
+        # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-10_16-48-24/checkpoints_prop/LSTM_best.pth"
+        # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-12_12-40-13/checkpoints_prop/LSTM_best.pth"
+        trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-12_18-14-58/checkpoints_prop/LSTM_best.pth"
         self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
         print("Load prop model")
 
