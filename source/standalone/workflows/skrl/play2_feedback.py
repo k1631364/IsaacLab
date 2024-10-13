@@ -246,7 +246,14 @@ def main():
                 print(success_rate_1env)
                 # wandb.log({"Episode_num": total_episode_num})  
                 # wandb.log({"success_rate": success_rate_1env}) 
-                wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env})
+
+                if "log" in infos and "end_rmse" in infos["log"]:
+                    end_rmse = infos["log"]["end_rmse"]
+                    # print(infos["log"]["end_rmse"])
+                    # print(end_rmse)       
+                    wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env, "end_rmse": end_rmse})
+                else: 
+                    wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env})
                 prev_total_episode_num = total_episode_num 
 
             # print(total_episode_num)
