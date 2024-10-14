@@ -347,14 +347,18 @@ class DirectRLEnvFeedback(DirectRLEnv):
         self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
         self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
 
-        curr_rmse = done_info["curr_rmse"]
-        # print(curr_rmse.shape)
-        end_tensor = success_tensor | failed_tensor
-        # print(end_tensor.shape)
-        # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
-        self.end_rmse_record = torch.where(end_tensor, curr_rmse, self.end_rmse_record)
-        # print(self.end_rmse_record)
-        # print(self.end_rmse_record.mean())
+        end_rmse_record_mean = 0.0
+        if "curr_rmse" in done_info: 
+            curr_rmse = done_info["curr_rmse"]
+            # print(curr_rmse.shape)
+            end_tensor = success_tensor | failed_tensor
+            # print(end_tensor.shape)
+            # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+            self.end_rmse_record = torch.where(end_tensor, curr_rmse, self.end_rmse_record)
+            # print(self.end_rmse_record)
+            # print(self.end_rmse_record.mean())
+            end_rmse_record_mean = self.end_rmse_record.mean()
+
 
         # print(success_tensor.shape)
         if success_tensor[0]==True:
@@ -372,7 +376,7 @@ class DirectRLEnvFeedback(DirectRLEnv):
         # print(success_rate)
 
         self.extras["log"] = {"success_rate": success_rate, 
-                              "end_rmse": self.end_rmse_record.mean()}
+                              "end_rmse": end_rmse_record_mean}
 
         if "exp_traj" in self.obs_buf: 
             self.extras["two_phase"] = {"episode_length_buf": self.episode_length_buf, 

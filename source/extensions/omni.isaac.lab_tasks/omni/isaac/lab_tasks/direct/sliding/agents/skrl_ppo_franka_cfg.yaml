@@ -58,7 +58,7 @@ agent:
     experiment_name: ""
     write_interval: 120
     checkpoint_interval: 120
-    wandb: False,             # whether to use Weights & Biases
+    wandb: True             # whether to use Weights & Biases
     wandb_kwargs:
       project: "isaac-sim-slidingtest"
       name: "" # wandb kwargs (see https://docs.wandb.ai/ref/python/init)
@@ -70,7 +70,7 @@ prop_estimator:
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
   learning_rate: 0.001
   train: True
-  num_epochs: 8
+  num_epochs: 5
 
   position_index: [0,1,3,4]
   rotation_index: 2
@@ -94,7 +94,7 @@ prop_estimator:
 
   fric_max: 0.3 # 1.0
   fric_min: 0.05 # 0.0
-  estimate_target_min: 0.1
+  estimate_target_min: -0.9
   estimate_target_max: 0.9
 
 
