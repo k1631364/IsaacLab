@@ -76,7 +76,7 @@ PPO_DEFAULT_CONFIG = {
 }
 # [end-config-dict-torch]
 
-class PPO_RNN_PROP(Agent):
+class PPO_RNN_PROPEXP(Agent):
     def __init__(self,
                  models: Mapping[str, Model],
                  memory: Optional[Union[Memory, Tuple[Memory]]] = None,
