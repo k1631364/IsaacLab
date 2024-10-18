@@ -220,16 +220,21 @@ class PPO_RNN_PROPEXP(Agent):
         self.prop_criterion = nn.MSELoss()
         self.prop_optimizer = optim.Adam(self.prop_model.parameters(), lr=prop_learning_rate)
 
-        if self.cfg["prop_estimator"]["train"]: 
-            self.prop_model.train()
+        if not self.cfg["prop_estimator"]["pre_trained"]: 
             print("Train prop model from scratchs")
         else: 
+            print("Load pre-trained prop model")
             # self.prop_model.eval()
             # # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-07_22-26-19/checkpoints_prop/LSTM_best.pth"
             # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"
             # self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
             # print("Load prop model")
-            pass
+            # trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-14_09-49-25/checkpoints_prop/LSTM_best.pth"
+            trained_model_path = self.cfg["prop_estimator"]["pre_trained_path"]
+            self.prop_model.load_state_dict(torch.load(trained_model_path, map_location=torch.device(self.device)))
+            print("Pre-trained model loaded")
+
+        self.prop_model_freeze_weights = self.cfg["prop_estimator"]["freeze_weights"]
 
         # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"   # short pushing
         # trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
@@ -249,8 +254,6 @@ class PPO_RNN_PROPEXP(Agent):
 
         self.curr_rollout_rnn_input = []
         self.curr_rollout_rnn_target = []
-
-        self.temp_tensor = None
 
     def init(self, trainer_cfg: Optional[Mapping[str, Any]] = None) -> None:
         """Initialize the agent
@@ -345,7 +348,8 @@ class PPO_RNN_PROPEXP(Agent):
         normalized_curr_rnn_prop_input[:, :, self.rotation_index] = normalized_rotation
         normalized_curr_rnn_prop_input[:, :, self.velocity_index] = normalized_velocities
 
-        self.curr_rollout_rnn_input.append(normalized_curr_rnn_prop_input)
+        if not self.prop_model_freeze_weights: 
+            self.curr_rollout_rnn_input.append(normalized_curr_rnn_prop_input)
         # self.curr_rollout_rnn_input.append(curr_rnn_prop_input)
 
         curr_rnn_prop_target = infos["prop"][:,0].reshape(-1,1)
@@ -353,13 +357,15 @@ class PPO_RNN_PROPEXP(Agent):
         normalized_friction = normalize(frictions, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
         normalized_curr_rnn_prop_target = normalized_friction
 
-        self.curr_rollout_rnn_target.append(normalized_curr_rnn_prop_target)
+        if not self.prop_model_freeze_weights: 
+            self.curr_rollout_rnn_target.append(normalized_curr_rnn_prop_target)
 
         # print("Current shapeeeee")
         # print(curr_rnn_prop_input.shape)
         # print(curr_rnn_prop_target.shape)
 
-        normalized_output = self.prop_model(normalized_curr_rnn_prop_input)
+        with torch.no_grad():
+            normalized_output = self.prop_model(normalized_curr_rnn_prop_input)
 
         denormalsied_output = denormalize(normalized_output, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
         denormalsied_target = denormalize(normalized_curr_rnn_prop_target, self.fric_min, self.fric_max, self.estimate_target_min, self.estimate_target_max)
@@ -537,9 +543,11 @@ class PPO_RNN_PROPEXP(Agent):
         if not self._rollout % self._rollouts and timestep >= self._learning_starts:
             self.set_mode("train")
             self._update(timestep, timesteps)
-            self.prop_model.train()
-            self._update_prop_estimator(timestep, timesteps)
-            self.prop_model.eval()
+            if not self.prop_model_freeze_weights: 
+                # print("update prop model")
+                self.prop_model.train()
+                self._update_prop_estimator(timestep, timesteps)
+                self.prop_model.eval()
             self.set_mode("eval")
 
         # write tracking data and checkpoints

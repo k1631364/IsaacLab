@@ -53,6 +53,7 @@ from datetime import datetime
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG #,PPO_RNN
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
 from source.skrl_custom.ppo_rnn_propexp import PPO_RNN_PROPEXP
+from skrl.multi_agents.torch.ippo import IPPO, IPPO_DEFAULT_CONFIG
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -70,6 +71,70 @@ from omni.isaac.lab_tasks.utils.wrappers.skrl_feedback_propexp import SkrlSequen
 # from source.offline_learning.model import RNNPropertyEstimator 
 # import source.offline_learning.model.RNNPropertyEstimator as rnnmodel
 
+# def create_agent(experiment_cfg, env): 
+#     print("exoeriment cfg")
+#     print(experiment_cfg["models"]["policy"])
+#     models = {}
+#     # non-shared models
+#     if experiment_cfg["models"]["separate"]:
+#         models["policy"] = gaussian_model(
+#             observation_space=env.observation_space,
+#             action_space=env.action_space,
+#             device=env.device,
+#             **process_skrl_cfg(experiment_cfg["models"]["policy"]),
+#         )
+#         models["value"] = deterministic_model(
+#             observation_space=env.observation_space,
+#             action_space=env.action_space,
+#             device=env.device,
+#             **process_skrl_cfg(experiment_cfg["models"]["value"]),
+#         )
+#     # shared models
+#     else:
+#         models["policy"] = shared_model(
+#             observation_space=env.observation_space,
+#             action_space=env.action_space,
+#             device=env.device,
+#             structure=None,
+#             roles=["policy", "value"],
+#             parameters=[
+#                 process_skrl_cfg(experiment_cfg["models"]["policy"]),
+#                 process_skrl_cfg(experiment_cfg["models"]["value"]),
+#             ],
+#         )
+#         models["value"] = models["policy"]
+
+#     memory_size = experiment_cfg["agent"]["rollouts"]  # memory_size is the agent's number of rollouts
+#     memory = RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
+#     # Memory to save all transitions
+#     max_episode_length = env.unwrapped.max_episode_length
+#     memory_all = RandomMemory(memory_size=max_episode_length*100, num_envs=env.num_envs, device=env.device)
+
+#     agent_cfg = PPO_DEFAULT_CONFIG.copy()
+#     experiment_cfg["agent"]["rewards_shaper"] = None  # avoid 'dictionary changed size during iteration'
+#     agent_cfg.update(process_skrl_cfg(experiment_cfg["agent"]))
+#     agent_cfg["state_preprocessor_kwargs"].update({"size": env.observation_space, "device": env.device})
+#     agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
+
+#     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
+
+#     agent = PPO_RNN_PROPEXP(
+#         models=models,
+#         memory=memory,
+#         cfg=agent_cfg,
+#         observation_space=env.observation_space,
+#         action_space=env.action_space,
+#         device=env.device,
+#         # memory_all=memory_all, 
+#     )
+
+#     agent.init()
+#     # agent.load(resume_path)
+#     # set agent to evaluation mode
+#     agent.set_running_mode("eval")
+
+#     return agent
+
 # Test comment (Working)
 def main():
 
@@ -82,6 +147,7 @@ def main():
         args_cli.task, use_gpu=not args_cli.cpu, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
     )
     experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_cfg_entry_point")
+    prop_experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_exp_cfg_entry_point")
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
@@ -130,6 +196,11 @@ def main():
 
     # instantiate models using skrl model instantiator utility
     # https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
+
+    import copy
+    exp_experiment_cfg = copy.deepcopy(experiment_cfg)
+    exp_env = SkrlVecEnvWrapper(env)
+
     models = {}
     # non-shared models
     if experiment_cfg["models"]["separate"]:
@@ -188,10 +259,59 @@ def main():
         # memory_all=memory_all, 
     )
 
+    ### Exp model ###
+    exp_models = {}
+    # non-shared exp_models
+    if exp_experiment_cfg["models"]["separate"]:
+        exp_models["policy"] = gaussian_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            **process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
+        )
+        exp_models["value"] = deterministic_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            **process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
+        )
+    # shared exp_models
+    else:
+        exp_models["policy"] = shared_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            structure=None,
+            roles=["policy", "value"],
+            parameters=[
+                process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
+                process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
+            ],
+        )
+        exp_models["value"] = exp_models["policy"]
+
+    exp_memory_size = exp_experiment_cfg["agent"]["rollouts"]  # exp_exp_memory_size is the agent's number of rollouts
+    exp_memory = RandomMemory(memory_size=exp_memory_size, num_envs=env.num_envs, device=env.device)
+
+    exp_agent_cfg = copy.deepcopy(agent_cfg)
+    exp_agent_cfg["prop_estimator"] = prop_experiment_cfg["prop_estimator"]
+    exp_agent = PPO_RNN_PROPEXP(
+        models=exp_models,
+        memory=exp_memory,
+        cfg=exp_agent_cfg,
+        observation_space=env.observation_space,
+        action_space=env.action_space,
+        device=env.device,
+        # memory_all=memory_all, 
+    )
+
+    ### Exp model ends ###
+
     # configure and instantiate a custom RL trainer for logging episode events
     # https://skrl.readthedocs.io/en/latest/api/trainers.html
     trainer_cfg = experiment_cfg["trainer"]
-    trainer = SkrlSequentialLogTrainer_FeedbackPropExp(cfg=trainer_cfg, env=env, agents=agent)
+    #     cfg=agent_cfg,
+    trainer = SkrlSequentialLogTrainer_FeedbackPropExp(cfg=trainer_cfg, env=env, agents=agent, exp_agent=exp_agent)
 
     print("Before expeirmnet start!!!!!!!!!!!!!!!!!!!!!!!")
     print("Log dir")

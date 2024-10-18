@@ -52,6 +52,7 @@ from datetime import datetime
 
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG #,PPO_RNN
 from source.skrl_custom.ppo_rnn_prop import PPO_RNN_PROP
+from source.skrl_custom.ppo_rnn_propexp import PPO_RNN_PROPEXP
 from skrl.memories.torch import RandomMemory
 from skrl.utils import set_seed
 from skrl.utils.model_instantiators.torch import deterministic_model, gaussian_model, shared_model
@@ -176,7 +177,7 @@ def main():
 
     agent_cfg["prop_estimator"] = experiment_cfg["prop_estimator"]
 
-    agent = PPO_RNN_PROP(
+    agent = PPO_RNN_PROPEXP(
         models=models,
         memory=memory,
         cfg=agent_cfg,

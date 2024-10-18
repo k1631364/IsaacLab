@@ -146,6 +146,7 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
         self,
         env: Wrapper,
         agents: Agent | list[Agent],
+        exp_agent: Agent | list[Agent] | None = None, 
         agents_scope: list[int] | None = None,
         cfg: dict | None = None,
     ):
@@ -158,6 +159,21 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
                 train on. Defaults to None.
             cfg: Configuration dictionary. Defaults to None.
         """
+
+        # self.exp_agent = exp_agent
+        # self.exp_agent.init()
+        # # exp_agent.load(resume_path)
+        # # set agent to evaluation mode
+        # self.exp_agent.set_running_mode("eval")
+
+        # initialize exp agent
+        if exp_agent != None: 
+            self.exp_agent = exp_agent
+            self.exp_agent.init()
+            # self.exp_agent.load(resume_path)
+            # set agent to evaluation mode
+            self.exp_agent.set_running_mode("eval")
+
         # update the config
         _cfg = copy.deepcopy(SEQUENTIAL_TRAINER_DEFAULT_CONFIG)
         _cfg.update(cfg if cfg is not None else {})
@@ -171,15 +187,6 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
                 agent.init(trainer_cfg=self.cfg)
         else:
             self.agents.init(trainer_cfg=self.cfg)
-
-        exp_agent = PPO_RNN_PROP(
-            models=models,
-            memory=None,  # memory is optional during evaluation
-            cfg=agent_cfg,
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            device=env.device,
-        )
 
     def train(self):
         """Train the agents sequentially.
@@ -215,7 +222,11 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
                 # print(infos["rnn_input"].shape)
                 # actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
                 actions, log_prob, outputs, prop_estimator_output = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
-
+                with torch.inference_mode():
+                    # agent stepping
+                    # actions = agent.act(obs, timestep=0, timesteps=0)[0]
+                    actions2, log_prob2, outputs2, prop_estimator_output2 = self.exp_agent.act(states, infos, timestep=0, timesteps=0)
+                    
             # print("RNN losssss")
             # print(rnn_loss)
             

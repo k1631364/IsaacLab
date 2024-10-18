@@ -70,6 +70,7 @@ def process_skrl_cfg(cfg: dict) -> dict:
 
     def update_dict(d):
         for key, value in d.items():
+            print(f"Key: {key}, Value: {value}, Type: {type(value)}")
             if isinstance(value, dict):
                 update_dict(value)
             else:
