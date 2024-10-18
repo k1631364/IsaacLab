@@ -70,6 +70,7 @@ def main():
         args_cli.task, use_gpu=not args_cli.cpu, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
     )
     experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_cfg_entry_point")
+    prop_experiment_cfg = load_cfg_from_registry(args_cli.task, "skrl_exp_cfg_entry_point")
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
@@ -113,6 +114,9 @@ def main():
 
     # wrap around environment for skrl
     env = SkrlVecEnvWrapper(env)  # same as: `wrap_env(env, wrapper="isaac-orbit")`
+
+    import copy
+    exp_experiment_cfg = copy.deepcopy(experiment_cfg)
 
     # instantiate models using skrl model instantiator utility
     # https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
@@ -169,6 +173,56 @@ def main():
         device=env.device,
     )
 
+    ### Exp model ###
+    exp_models = {}
+    # non-shared exp_models
+    if exp_experiment_cfg["models"]["separate"]:
+        exp_models["policy"] = gaussian_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            **process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
+        )
+        exp_models["value"] = deterministic_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            **process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
+        )
+    # shared exp_models
+    else:
+        exp_models["policy"] = shared_model(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=env.device,
+            structure=None,
+            roles=["policy", "value"],
+            parameters=[
+                process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
+                process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
+            ],
+        )
+        exp_models["value"] = exp_models["policy"]
+
+    exp_agent_cfg = copy.deepcopy(agent_cfg)
+    exp_agent_cfg["prop_estimator"] = prop_experiment_cfg["prop_estimator"]
+    exp_agent = PPO_RNN_PROPEXP(
+        models=exp_models,
+        memory=None,
+        cfg=exp_agent_cfg,
+        observation_space=env.observation_space,
+        action_space=env.action_space,
+        device=env.device,
+        # memory_all=memory_all, 
+    )
+    
+    exp_agent.init()
+    # exp_agent.load(resume_path)
+    # set agent to evaluation mode
+    exp_agent.set_running_mode("eval")    
+
+    ### Exp model ends ###
+
     # initialize agent
     agent.init()
     agent.load(resume_path)
@@ -201,7 +255,11 @@ def main():
             # agent stepping
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
             actions, log_prob, outputs, prop_estimator_output = agent.act(obs, infos, timestep=0, timesteps=0)
+            # print(actions.shape)
+            # print(outputs["mean_actions"].shape)
+            actions2, log_prob2, outputs2, prop_estimator_output2 = exp_agent.act(obs, infos, timestep=0, timesteps=0)
             
+            actions = outputs["mean_actions"]
             # get prop estimate
             prop_info = {}
             prop_info["prop_estimator_output"] = prop_estimator_output
