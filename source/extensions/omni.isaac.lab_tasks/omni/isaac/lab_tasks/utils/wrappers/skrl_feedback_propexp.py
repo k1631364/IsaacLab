@@ -173,6 +173,10 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
             # self.exp_agent.load(resume_path)
             # set agent to evaluation mode
             self.exp_agent.set_running_mode("eval")
+            # print(self.exp_agent.cfg)
+
+            # import sys
+            # sys.exit(0)
 
         # update the config
         _cfg = copy.deepcopy(SEQUENTIAL_TRAINER_DEFAULT_CONFIG)

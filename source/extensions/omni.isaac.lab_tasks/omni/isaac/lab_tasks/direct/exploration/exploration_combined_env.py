@@ -670,6 +670,9 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         # print(self.groundtruth_prop)
         squared_error = (self.denormalsied_output - self.denormalsied_target) ** 2
         self.prop_rmse_eachenv = torch.sqrt(squared_error).squeeze() 
+        if self.prop_rmse_eachenv.numel() == 1 and self.prop_rmse_eachenv.dim() == 0:
+            self.prop_rmse_eachenv = self.prop_rmse_eachenv.unsqueeze(0)
+
 
         # print(prop_rmse_eachenv)
 
@@ -859,6 +862,15 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
             tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
         for tensor in self.past_action_prop:
             tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+        
+        if self.denormalsied_output is not None: 
+            self.denormalsied_output[selected_envs, :] = 1.0
+            self.denormalsied_target[selected_envs, :] = 1.0
+            self.prop_rmse_eachenv[selected_envs] = 1.0
+            # print(self.denormalsied_output.shape)
+            # print(self.denormalsied_target.shape)
+            # print(self.prop_rmse_eachenv.shape)
+
 
         # Reset goal
         # curr_success_rate = self.extras.get('log')

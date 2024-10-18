@@ -260,6 +260,7 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     goal_location = [0.5, 0.0, 1.0]
     goal_length = 0.1
     max_puck_goalcount = 10
+    max_estimation_goalcount = 5
 
     # markergoal1_cfg = VisualizationMarkersCfg(
     #     prim_path="/Visual/Goal1",
@@ -349,10 +350,14 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Out of bound counter: goal puck (puck in goal)
         self.out_of_bounds_goal_puck_posx_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
+        self.out_of_bounds_goal_prop_estimate_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
 
         # Recent episode success/failure tracking (1: success, 0: failure)
         self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
         # self.inside_goal = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
+
+        self.goal_bounds_exp = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
+        self.task_phase = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
 
         # Past puck velocity and acceleration tracking
         self.prev_puck_vel = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
@@ -367,6 +372,9 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.maxgoal_locations = self.goal_locations[:,0]+(self.goal_length/2.0)-(self.cfg.puck_length/2.0)  # the cart is reset if it exceeds that position [m] (-0.7)
         self.mingoal_locations = (self.goal_locations[:,0]-(self.goal_length/2.0))+(self.cfg.puck_length/2.0)
         self.goal_threshold = 0.1
+
+        # property estimation goal
+        self.prop_estimate_threshold = 0.05
         
         # Goal randomisation range
         self.goal_location_min = 0.25
@@ -881,6 +889,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # print(self.groundtruth_prop)
         squared_error = (self.denormalsied_output - self.denormalsied_target) ** 2
         self.prop_rmse_eachenv = torch.sqrt(squared_error).squeeze() 
+        if self.prop_rmse_eachenv.numel() == 1 and self.prop_rmse_eachenv.dim() == 0:
+            self.prop_rmse_eachenv = self.prop_rmse_eachenv.unsqueeze(0)
 
         # print(prop_rmse_eachenv) 
 
@@ -1024,6 +1034,19 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
 
+        # Goal for exploration
+        curr_out_of_bounds_goal_prop_estimate_count = self.prop_rmse_eachenv < self.prop_estimate_threshold
+
+        self.out_of_bounds_goal_prop_estimate_count+= curr_out_of_bounds_goal_prop_estimate_count.int()
+
+        self.goal_bounds_exp = self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount
+        self.out_of_bounds_goal_prop_estimate_count[self.out_of_bounds_goal_prop_estimate_count>self.cfg.max_estimation_goalcount] = 0
+        self.out_of_bounds_goal_prop_estimate_count[~curr_out_of_bounds_goal_prop_estimate_count] = 0
+
+        self.task_phase[self.goal_bounds_exp] = True
+        # print("Task phase checker")
+        # print(self.task_phase)
+
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds | out_of_bounds_min_puck_velx     
         out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
 
@@ -1070,7 +1093,9 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         done_info = {}
         done_info = {
-            "curr_rmse": self.prop_rmse_eachenv
+            "curr_rmse": self.prop_rmse_eachenv, 
+            "goal_bounds_exp": self.goal_bounds_exp, 
+            "task_phase": self.task_phase
         }
 
         return out_of_bounds, time_out, self.goal_bounds, episode_failed, done_info
@@ -1104,6 +1129,18 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # print(selected_envs)
         for tensor in self.past_obs_prop:
             tensor[0, selected_envs, :] = 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+        for tensor in self.past_action_prop:
+            tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
+        
+        if self.denormalsied_output is not None: 
+            self.denormalsied_output[selected_envs, :] = 1.0
+            self.denormalsied_target[selected_envs, :] = 1.0
+            self.prop_rmse_eachenv[selected_envs] = 1.0
+            # print(self.denormalsied_output.shape)
+            # print(self.denormalsied_target.shape)
+            # print(self.prop_rmse_eachenv.shape)
+
+        self.task_phase[selected_envs] = False
 
         # self.past_obs_prop = [self.initial_obs_tensor_prop.clone() for _ in range(self.past_timestep_prop)]
         # self.past_action_prop = [self.initial_action_tensor_prop.clone() for _ in range(self.past_timestep_prop)]

@@ -175,25 +175,27 @@ def main():
 
     ### Exp model ###
     exp_models = {}
+    exp_observation_space = prop_experiment_cfg["prop_estimator"]["pre_trained_observation_space"]
+    exp_action_space = prop_experiment_cfg["prop_estimator"]["pre_trained_action_space"]
     # non-shared exp_models
     if exp_experiment_cfg["models"]["separate"]:
         exp_models["policy"] = gaussian_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             **process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
         )
         exp_models["value"] = deterministic_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             **process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
         )
     # shared exp_models
     else:
         exp_models["policy"] = shared_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             structure=None,
             roles=["policy", "value"],
@@ -206,20 +208,25 @@ def main():
 
     exp_agent_cfg = copy.deepcopy(agent_cfg)
     exp_agent_cfg["prop_estimator"] = prop_experiment_cfg["prop_estimator"]
+    exp_agent_cfg["state_preprocessor_kwargs"].update({"size": exp_observation_space, "device": env.device})
+    exp_agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
     exp_agent = PPO_RNN_PROPEXP(
         models=exp_models,
         memory=None,
         cfg=exp_agent_cfg,
-        observation_space=env.observation_space,
-        action_space=env.action_space,
+        observation_space=exp_observation_space,
+        action_space=exp_action_space,
         device=env.device,
         # memory_all=memory_all, 
     )
-    
+
     exp_agent.init()
-    # exp_agent.load(resume_path)
+    print("Pre-trained exp path")
+    pre_trained_policy_path = prop_experiment_cfg["prop_estimator"]["pre_trained_policy_path"]
+    print(pre_trained_policy_path)
+    exp_agent.load(pre_trained_policy_path)
     # set agent to evaluation mode
-    exp_agent.set_running_mode("eval")    
+    exp_agent.set_running_mode("eval") 
 
     ### Exp model ends ###
 
@@ -254,15 +261,29 @@ def main():
         with torch.inference_mode():
             # agent stepping
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
-            actions, log_prob, outputs, prop_estimator_output = agent.act(obs, infos, timestep=0, timesteps=0)
+            actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs, infos, timestep=0, timesteps=0)
             # print(actions.shape)
             # print(outputs["mean_actions"].shape)
-            actions2, log_prob2, outputs2, prop_estimator_output2 = exp_agent.act(obs, infos, timestep=0, timesteps=0)
+            obs_exp = obs[:, :exp_observation_space]
+            actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
+
+            actions = actions_exp
+            if "prop_estimation" in infos: 
+                # print("curr rmse")
+                # print(infos["prop_estimation"]["curr_rmse"])
+                # print(infos["prop_estimation"]["task_phase"])
+                # print(infos["prop_estimation"]["goal_bounds_exp"])
+                # print(infos["prop_estimation"]["goal_bounds_exp"].shape)
+                # print(actions.shape)
+                # print(actions2.shape)
+                task_phase = infos["prop_estimation"]["task_phase"].to(env.device)
+                final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_exp)
+                actions = final_actions
             
-            actions = outputs["mean_actions"]
+            # actions2 = outputs["mean_actions"]
             # get prop estimate
             prop_info = {}
-            prop_info["prop_estimator_output"] = prop_estimator_output
+            prop_info["prop_estimator_output"] = prop_estimator_output_task
             # print("Prop info")
             # print(prop_info)
             env._get_estimation(prop_info)

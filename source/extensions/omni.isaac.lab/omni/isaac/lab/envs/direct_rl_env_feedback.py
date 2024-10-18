@@ -359,6 +359,14 @@ class DirectRLEnvFeedback(DirectRLEnv):
             # print(self.end_rmse_record.mean())
             end_rmse_record_mean = self.end_rmse_record.mean()
 
+            self.extras["prop_estimation"] = {
+                "curr_rmse": done_info["curr_rmse"], 
+            } 
+
+        if "goal_bounds_exp" in done_info: 
+            self.extras["prop_estimation"]["goal_bounds_exp"] = done_info["goal_bounds_exp"]
+        if "task_phase" in done_info: 
+            self.extras["prop_estimation"]["task_phase"] = done_info["task_phase"]
 
         # print(success_tensor.shape)
         if success_tensor[0]==True:

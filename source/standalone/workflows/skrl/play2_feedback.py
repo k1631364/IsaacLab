@@ -209,6 +209,13 @@ def main():
             # print(prop_info)
             env._get_estimation(prop_info)
 
+            if "prop_estimation" in infos: 
+                # print("curr rmse")
+                # print(infos["prop_estimation"])
+                # print("Passed info")
+                # print(prop_estimator_output)
+                pass
+
             # env stepping
             obs, _, _, _, infos = env.step(actions)
             # print("Infos keys")

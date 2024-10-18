@@ -107,7 +107,7 @@ prop_estimator:
   num_layers: 1      # Number of LSTM layers
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
   learning_rate: 0.001
-  pre_trained: True
+  pre_trained: False
   pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-17_18-31-10/checkpoints_prop/LSTM_best.pth"
   freeze_weights: False
   num_epochs: 5
