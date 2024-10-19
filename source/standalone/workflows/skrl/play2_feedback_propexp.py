@@ -283,7 +283,7 @@ def main():
             # actions2 = outputs["mean_actions"]
             # get prop estimate
             prop_info = {}
-            prop_info["prop_estimator_output"] = prop_estimator_output_task
+            prop_info["prop_estimator_output"] = prop_estimator_output_exp
             # print("Prop info")
             # print(prop_info)
             env._get_estimation(prop_info)

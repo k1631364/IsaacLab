@@ -260,26 +260,29 @@ def main():
     )
 
     ### Exp model ###
+
     exp_models = {}
+    exp_observation_space = prop_experiment_cfg["prop_estimator"]["pre_trained_observation_space"]
+    exp_action_space = prop_experiment_cfg["prop_estimator"]["pre_trained_action_space"]
     # non-shared exp_models
     if exp_experiment_cfg["models"]["separate"]:
         exp_models["policy"] = gaussian_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             **process_skrl_cfg(exp_experiment_cfg["models"]["policy"]),
         )
         exp_models["value"] = deterministic_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             **process_skrl_cfg(exp_experiment_cfg["models"]["value"]),
         )
     # shared exp_models
     else:
         exp_models["policy"] = shared_model(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
+            observation_space=exp_observation_space,
+            action_space=exp_action_space,
             device=env.device,
             structure=None,
             roles=["policy", "value"],
@@ -295,6 +298,8 @@ def main():
 
     exp_agent_cfg = copy.deepcopy(agent_cfg)
     exp_agent_cfg["prop_estimator"] = prop_experiment_cfg["prop_estimator"]
+    exp_agent_cfg["state_preprocessor_kwargs"].update({"size": exp_observation_space, "device": env.device})
+    exp_agent_cfg["value_preprocessor_kwargs"].update({"size": 1, "device": env.device})
     exp_agent = PPO_RNN_PROPEXP(
         models=exp_models,
         memory=exp_memory,
@@ -304,6 +309,7 @@ def main():
         device=env.device,
         # memory_all=memory_all, 
     )
+
 
     ### Exp model ends ###
 

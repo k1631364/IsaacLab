@@ -128,6 +128,7 @@ prop_estimator:
   pre_trained_policy_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-18_18-27-53/checkpoints/best_agent.pt"
   pre_trained_observation_space: 11
   pre_trained_action_space: 2
+  policy_switch: False
 
   position_index: [0,1,3,4]
   rotation_index: 2

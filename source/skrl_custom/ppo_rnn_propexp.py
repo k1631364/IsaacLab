@@ -211,7 +211,7 @@ class PPO_RNN_PROPEXP(Agent):
         self.fric_min = self.cfg["prop_estimator"]["fric_min"] 
         self.fric_max = self.cfg["prop_estimator"]["fric_max"] 
         self.estimate_target_min = self.cfg["prop_estimator"]["estimate_target_min"]   
-        self.estimate_target_max = self.cfg["prop_estimator"]["estimate_target_max"]    
+        self.estimate_target_max = self.cfg["prop_estimator"]["estimate_target_max"]   
 
         # print(input_size)
         # print(learning_rate)
@@ -235,6 +235,8 @@ class PPO_RNN_PROPEXP(Agent):
             print("Pre-trained model loaded")
 
         self.prop_model_freeze_weights = self.cfg["prop_estimator"]["freeze_weights"]
+
+        self.policy_switch = self.cfg["prop_estimator"]["policy_switch"]  
 
         # trained_model_path = "/workspace/isaaclab/logs/skrl/shortpushing_direct/2024-10-08_21-04-10/checkpoints_prop/LSTM_best.pth"   # short pushing
         # trained_model_path = "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-09_20-41-41/checkpoints_prop/LSTM_best.pth"  # exploration
@@ -271,6 +273,7 @@ class PPO_RNN_PROPEXP(Agent):
             self.memory.create_tensor(name="values", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="returns", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="advantages", size=1, dtype=torch.float32)
+            self.memory.create_tensor(name="task_phase", size=1, dtype=torch.bool)
 
             # print("RNn param received in agent")
             # print(self.policy.get_rnn_param())
@@ -279,6 +282,9 @@ class PPO_RNN_PROPEXP(Agent):
 
             # tensors sampled during training
             self._tensors_names = ["states", "actions", "terminated", "log_prob", "values", "returns", "advantages"]
+
+            if self.policy_switch: 
+                self._tensors_names = ["states", "actions", "terminated", "log_prob", "values", "returns", "advantages", "task_phase"]
 
         # RNN specifications
         self._rnn = False  # flag to indicate whether RNN is available
@@ -500,8 +506,26 @@ class PPO_RNN_PROPEXP(Agent):
             # print(rnn_states["rnn_policy_1"].shape)
             # print(rnn_states["rnn_value_0"].shape)
             # print(rnn_states["rnn_value_1"].shape)
+            # states=states[env_idx],
+            # print("State shapeee")
+            # print(states.shape)
+            # n = 4000
+            # selected_states = states[:n, :]
+            # selected_actions = actions[:n, :]
+            # selected_rewards = rewards[:n, :]
+            # selected_next_states = next_states[:n, :]
+            # selected_terminated = terminated[:n, :]
+            # selected_truncated = truncated[:n, :]
+            # selected_current_log_prob = self._current_log_prob[:n, :]
+            # selected_values = values[:n, :]
+            # self.memory.add_samples(states=selected_states, actions=selected_actions, rewards=selected_rewards, next_states=selected_next_states,
+            #                         terminated=selected_terminated, truncated=selected_truncated, log_prob=selected_current_log_prob, values=selected_values)
+
+            task_phase = infos["prop_estimation"]["task_phase"].view(-1,1)
+            # self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
+            #                         terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
-                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
+                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, task_phase=task_phase, **rnn_states)
             for memory in self.secondary_memories:
                 memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
@@ -642,11 +666,11 @@ class PPO_RNN_PROPEXP(Agent):
         # print(self._mini_batches)
         # print(self._rnn_sequence_length)
         sampled_batches = self.memory.sample_all(names=self._tensors_names, mini_batches=self._mini_batches, sequence_length=self._rnn_sequence_length)
-            # print("Check sample batch shape")
-            # # first mini-batch = sampled_batches[0]
-            # curr_mini_batch = sampled_batches[0]
-            # curr_mini_batch_states = curr_mini_batch[0]
-            # print(curr_mini_batch_states.shape)
+        # print("Check sample batch shape")
+        # # first mini-batch = sampled_batches[0]
+        # curr_mini_batch = sampled_batches[0]
+        # curr_mini_batch_states = curr_mini_batch[0]
+        # print(curr_mini_batch_states.shape)
         # import sys
         # sys.exit(0)
 
@@ -670,10 +694,40 @@ class PPO_RNN_PROPEXP(Agent):
             # mini-batches loop
             # test_sample = sampled_batches[i][0]
             # print(test_sample.shape)
-            for i, (sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages) in enumerate(sampled_batches):
+            # for i, (sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages) in enumerate(sampled_batches):
+            for i, sampled_batch in enumerate(sampled_batches):
+                if self.policy_switch: 
+                    sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages, sampled_taskphase = sampled_batch
+                else: 
+                    sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages = sampled_batch
+                # sampled_states, sampled_actions, sampled_dones, sampled_log_prob, sampled_values, sampled_returns, sampled_advantages = sampled_batch
                 # print("Sampled states")
                 # print(sampled_states.shape)
                 # print(i)
+                # print(sampled_states.shape)
+                # n = 600
+                # sampled_states = sampled_states[:n, :]
+                # sampled_actions = sampled_actions[:n, :]
+                # sampled_dones = sampled_dones[:n, :]
+                # sampled_log_prob = sampled_log_prob[:n, :]
+                # sampled_values = sampled_values[:n, :]
+                # sampled_returns = sampled_returns[:n, :]
+                # sampled_advantages = sampled_advantages[:n, :]
+
+                # # print(sampled_taskphase.shape)
+                # # num_true = torch.sum(sampled_taskphase).item()  # Convert to Python int
+                # # print(num_true)
+                # bool_mask = sampled_taskphase.squeeze(1)  # Now shape is (32768,)
+                # # sampled_states_filtered = sampled_states[bool_mask]
+                # # print(sampled_states_filtered.shape)
+
+                # sampled_states = sampled_states[bool_mask]
+                # sampled_actions = sampled_actions[bool_mask]
+                # sampled_dones = sampled_dones[bool_mask]
+                # sampled_log_prob = sampled_log_prob[bool_mask]
+                # sampled_values = sampled_values[bool_mask]
+                # sampled_returns = sampled_returns[bool_mask]
+                # sampled_advantages = sampled_advantages[bool_mask]
 
                 import numpy as np
                 xpoints = np.arange(0, self._mini_batches) 

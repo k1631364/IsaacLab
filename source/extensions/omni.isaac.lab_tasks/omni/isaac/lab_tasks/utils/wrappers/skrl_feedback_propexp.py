@@ -170,10 +170,13 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
         if exp_agent != None: 
             self.exp_agent = exp_agent
             self.exp_agent.init()
-            # self.exp_agent.load(resume_path)
+            # print(self.exp_agent.cfg["prop_estimator"]["pre_trained_policy_path"])
+            pre_trained_policy_path = self.exp_agent.cfg["prop_estimator"]["pre_trained_policy_path"]
+            self.exp_agent.load(pre_trained_policy_path)
             # set agent to evaluation mode
             self.exp_agent.set_running_mode("eval")
-            # print(self.exp_agent.cfg)
+
+            self.exp_observation_space = self.exp_agent.cfg["prop_estimator"]["pre_trained_observation_space"]
 
             # import sys
             # sys.exit(0)
@@ -217,6 +220,18 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
             self.agents.pre_interaction(timestep=timestep, timesteps=self.timesteps)
             # compute actions
             with torch.no_grad():
+
+                if "prop_estimation" in infos: 
+                    # print("curr rmse")
+                    # print(infos["prop_estimation"]["curr_rmse"])
+                    # print(infos["prop_estimation"]["task_phase"])
+                    # print(infos["prop_estimation"]["goal_bounds_exp"])
+                    # print(infos["prop_estimation"]["goal_bounds_exp"].shape)
+                    # print(actions.shape)
+                    # print(actions2.shape)
+                    task_phase = infos["prop_estimation"]["task_phase"].to(self.env.device)
+                    # print(task_phase)
+
                 # print(states.shape)  # torch.Size([# of env, obs dim])
                 # print(timestep)   # 0
                 # print(self.timesteps)   # 1600
@@ -225,17 +240,34 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
                 # print(infos.keys()) 
                 # print(infos["rnn_input"].shape)
                 # actions = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)[0]
-                actions, log_prob, outputs, prop_estimator_output = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
+                actions_task, log_prob_task, outputs_task, prop_estimator_output_task = self.agents.act(states, infos, timestep=timestep, timesteps=self.timesteps)
                 with torch.inference_mode():
                     # agent stepping
                     # actions = agent.act(obs, timestep=0, timesteps=0)[0]
-                    actions2, log_prob2, outputs2, prop_estimator_output2 = self.exp_agent.act(states, infos, timestep=0, timesteps=0)
-                    
+                    states_exp = states[:, :self.exp_observation_space]
+                    actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = self.exp_agent.act(states_exp, infos, timestep=0, timesteps=0)
+                actions = actions_task
+
+                # actions = actions_exp
+                # if "prop_estimation" in infos: 
+                #     # print("curr rmse")
+                #     # print(infos["prop_estimation"]["curr_rmse"])
+                #     # print(infos["prop_estimation"]["task_phase"])
+                #     # print(infos["prop_estimation"]["goal_bounds_exp"])
+                #     # print(infos["prop_estimation"]["goal_bounds_exp"].shape)
+                #     # print(actions.shape)
+                #     # print(actions2.shape)
+                #     task_phase = infos["prop_estimation"]["task_phase"].to(self.env.device)
+                #     final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_exp)
+                #     actions = final_actions
+                #     # print("task phase")
+                #     # print(task_phase)
+                        
             # print("RNN losssss")
             # print(rnn_loss)
             
             prop_info = {}
-            prop_info["prop_estimator_output"] = prop_estimator_output
+            prop_info["prop_estimator_output"] = prop_estimator_output_exp
             
             # step the environments
             self.env._get_estimation(prop_info)
@@ -264,8 +296,8 @@ class SkrlSequentialLogTrainer_FeedbackPropExp(Trainer):
             # print(infos)
             # if "log" in infos:
             #     infos["log"]["rnn_loss"] = rnn_loss
-            infos["log"]["rnn_loss"] = prop_estimator_output["rnn_loss"]
-            infos["log"]["rnn_rmse"] = prop_estimator_output["rnn_rmse"]
+            infos["log"]["rnn_loss"] = prop_estimator_output_exp["rnn_loss"]
+            infos["log"]["rnn_rmse"] = prop_estimator_output_exp["rnn_rmse"]
             # print(infos["log"]["rnn_rmse"] )
             if "log" in infos:
                 for k, v in infos["log"].items():
