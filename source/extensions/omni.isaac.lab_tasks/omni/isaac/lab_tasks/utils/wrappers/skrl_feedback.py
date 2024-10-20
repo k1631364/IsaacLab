@@ -170,9 +170,11 @@ class SkrlSequentialLogTrainer_Feedback(Trainer):
         else:
             self.agents.init(trainer_cfg=self.cfg)
 
+        # self.agents.load("/workspace/isaaclab/logs/skrl/sliding_direct/2024-10-20_13-24-35/checkpoints/best_agent.pt")
+
     def train(self):
         """Train the agents sequentially.
-
+.
         This method executes the training loop for the agents. It performs the following steps:
 
         * Pre-interaction: Perform any pre-interaction operations.

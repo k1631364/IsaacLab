@@ -432,10 +432,22 @@ class PPO_RNN_PROPEXP(Agent):
         # print("act shapeeeee")
         # print(self._state_preprocessor(states).shape)
 
-        # print("Agent act called")
+        # # print("Agent act called")
         # print("Check state values")
         # print(states.shape)
+        # states_min_vals, _ = torch.min(states, dim=0)
+        # states_max_vals, _ = torch.max(states, dim=0)
+        # print("after processing")
         # print(self._state_preprocessor(states).shape)
+        # processed_states_min_vals, _ = torch.min(self._state_preprocessor(states), dim=0)
+        # processed_states_max_vals, _ = torch.max(self._state_preprocessor(states), dim=0)
+        # print("Min")
+        # print(states_min_vals)
+        # print(processed_states_min_vals)
+        # print("Max")
+        # print(states_max_vals)
+        # print(processed_states_max_vals)
+
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 

@@ -172,6 +172,20 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(puck_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
     )
+    # puck_length = 0.1
+    # puck_default_pos = 1.35
+    # cylinderpuck2_cfg: RigidObjectCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/cylinderpuck2",
+    #     spawn=sim_utils.CuboidCfg(
+    #         size = [0.05, puck_length, 0.05], 
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=0.15),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         activate_contact_sensors=True, 
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(puck_default_pos, 0.0, 1.05), rot=(1.0, 0.0, 0.0, 0.0)),
+    # )
 
     # Elle's example
     # object_cfg: RigidObjectCfg = RigidObjectCfg(
@@ -242,20 +256,35 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     #     init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
     # )
 
-    pusher_length = 0.013
+    # pusher_length = 0.013
+    # pusher_default_pos = 1.45
+    # cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/cuboidpusher2",
+    #     spawn=sim_utils.SphereCfg(
+    #         radius=pusher_length, 
+    #         # height = 0.05, 
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         activate_contact_sensors=True, 
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
+    # )
+    pusher_length = 0.032
     pusher_default_pos = 1.45
     cuboidpusher2_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/cuboidpusher2",
-        spawn=sim_utils.SphereCfg(
-            radius=pusher_length, 
-            # height = 0.05, 
+        spawn=sim_utils.CylinderCfg(
+            radius = pusher_length, 
+            height = 0.04, 
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),  # mass=0.23
             collision_props=sim_utils.CollisionPropertiesCfg(),
             activate_contact_sensors=True, 
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.025), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(pusher_default_pos, 0.0, 1.02), rot=(1.0, 0.0, 0.0, 0.0)),
     )
  
     # Goal
@@ -400,10 +429,10 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # Normalisaion range: object
         # self.object_location_normmax = self.goal_location_normmax
         # self.object_location_normmin = self.goal_location_normmin
-        self.object_location_normmax = 1.5
-        self.object_location_normmin = -1.5
-        self.object_vel_normmax = 4.0
-        self.object_vel_normmin = -4.0
+        self.object_location_normmax = 2.0
+        self.object_location_normmin = -2.0
+        self.object_vel_normmax = 3.0
+        self.object_vel_normmin = -3.0
         self.object_rot_normmax = 2.0
         self.object_rot_normmin = -2.0
 
@@ -420,6 +449,9 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         self.state_rot_idx = [6]
 
+        self.state_norm_max = 2
+        self.state_norm_min = -2
+
         # Past state tracking
         self.past_timestep = 1
         initial_pos_tensor = torch.zeros(self.past_timestep, self.num_envs, len(self.state_pos_idx), device=self.scene.env_origins.device)
@@ -430,6 +462,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.past_pusher_vel = [initial_vel_tensor]
         self.past_puck_vel = [initial_vel_tensor]
         self.past_puck_rot = [initial_rot_tensor]
+        self.past_puckpusher_relative = [initial_pos_tensor]
+        self.past_puckgoal_relative = [initial_pos_tensor]
 
         # Past state tracking for RNN prop estimation
         self.past_timestep_prop = 15
@@ -647,7 +681,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Pusher pos
         # normalized_curr_pusher_pos = (curr_cuboidpusher2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        normalized_curr_pusher_pos = normalize(curr_cuboidpusher2_state[:, self.state_pos_idx], self.object_location_normmin, self.object_location_normmax, -2, 2)
+        normalized_curr_pusher_pos = normalize(curr_cuboidpusher2_state[:, self.state_pos_idx], self.object_location_normmin, self.object_location_normmax, self.state_norm_min, self.state_norm_max)
         self.past_pusher_pos.append(normalized_curr_pusher_pos.unsqueeze(0))
         self.past_pusher_pos = self.past_pusher_pos[-self.past_timestep:]
         past_pusher_pos_tensor = torch.cat(self.past_pusher_pos, dim=0)
@@ -655,7 +689,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Pusher vel
         # normalized_curr_pusher_vel = (curr_cuboidpusher2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        normalized_curr_pusher_vel = normalize(curr_cuboidpusher2_state[:, self.state_vel_idx], self.object_vel_normmin, self.object_vel_normmax, -2, 2)
+        normalized_curr_pusher_vel = normalize(curr_cuboidpusher2_state[:, self.state_vel_idx], self.object_vel_normmin, self.object_vel_normmax, self.state_norm_min, self.state_norm_max)
         self.past_pusher_vel.append(normalized_curr_pusher_vel.unsqueeze(0))
         self.past_pusher_vel = self.past_pusher_vel[-self.past_timestep:]
         past_pusher_vel_tensor = torch.cat(self.past_pusher_vel, dim=0)
@@ -669,7 +703,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Puck pos
         # normalized_curr_puck_pos = (curr_cylinderpuck2_state[:, self.state_pos_idx] - self.object_location_normmin) / (self.object_location_normmax - self.object_location_normmin)
-        normalized_curr_puck_pos = normalize(curr_cylinderpuck2_state[:, self.state_pos_idx], self.object_location_normmin, self.object_location_normmax, -2, 2)
+        normalized_curr_puck_pos = normalize(curr_cylinderpuck2_state[:, self.state_pos_idx], self.object_location_normmin, self.object_location_normmax, self.state_norm_min, self.state_norm_max)
         self.past_puck_pos.append(normalized_curr_puck_pos.unsqueeze(0))
         self.past_puck_pos = self.past_puck_pos[-self.past_timestep:]
         past_puck_pos_tensor = torch.cat(self.past_puck_pos, dim=0)
@@ -677,29 +711,47 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Puck vel
         # normalized_curr_puck_vel = (curr_cylinderpuck2_state[:, self.state_vel_idx] - self.object_vel_normmin) / (self.object_vel_normmax - self.object_vel_normmin)
-        normalized_curr_puck_vel = normalize(curr_cylinderpuck2_state[:, self.state_vel_idx], self.object_vel_normmin, self.object_vel_normmax, -2, 2)
+        normalized_curr_puck_vel = normalize(curr_cylinderpuck2_state[:, self.state_vel_idx], self.object_vel_normmin, self.object_vel_normmax, self.state_norm_min, self.state_norm_max)
         self.past_puck_vel.append(normalized_curr_puck_vel.unsqueeze(0))
         self.past_puck_vel = self.past_puck_vel[-self.past_timestep:]
         past_puck_vel_tensor = torch.cat(self.past_puck_vel, dim=0)
         normalized_past_puck_vel_obs  = past_puck_vel_tensor
 
         # Puck orientation
-        normalized_curr_puck_rot = normalize(curr_cylinderpuck2_state[:, self.state_rot_idx], self.object_rot_normmin, self.object_rot_normmax, -2, 2)
+        normalized_curr_puck_rot = normalize(curr_cylinderpuck2_state[:, self.state_rot_idx], self.object_rot_normmin, self.object_rot_normmax, self.state_norm_min, self.state_norm_max)
         self.past_puck_rot.append(normalized_curr_puck_rot.unsqueeze(0))
         self.past_puck_rot = self.past_puck_rot[-self.past_timestep:]
         past_puck_rot_tensor = torch.cat(self.past_puck_rot, dim=0)
         normalized_past_puck_rot_obs  = past_puck_rot_tensor
+
+        # Puck-pusher relative position 
+        curr_puckpusher_relative = curr_cylinderpuck2_state[:, self.state_pos_idx] - curr_cuboidpusher2_state[:, self.state_pos_idx] 
+        normalized_curr_puckpusher_relative = normalize(curr_puckpusher_relative, self.object_location_normmin, self.object_location_normmax, self.state_norm_min, self.state_norm_max)
+        self.past_puckpusher_relative.append(normalized_curr_puckpusher_relative.unsqueeze(0))
+        self.past_puckpusher_relative = self.past_puckpusher_relative[-self.past_timestep:]
+        past_puckpusher_relative_tensor = torch.cat(self.past_puckpusher_relative, dim=0)
+        normalized_past_puckpusher_relative_obs  = past_puckpusher_relative_tensor
+
+        curr_puckgoal_relative = curr_cylinderpuck2_state[:, self.state_pos_idx] - self.goal_locations[:, self.state_pos_idx] 
+        normalized_curr_puckgoal_relative = normalize(curr_puckgoal_relative, self.object_location_normmin, self.object_location_normmax, self.state_norm_min, self.state_norm_max)
+        self.past_puckgoal_relative.append(normalized_curr_puckgoal_relative.unsqueeze(0))
+        self.past_puckgoal_relative = self.past_puckgoal_relative[-self.past_timestep:]
+        past_puckgoal_relative_tensor = torch.cat(self.past_puckgoal_relative, dim=0)
+        normalized_past_puckgoal_relative_obs  = past_puckgoal_relative_tensor
+        # print("Current relative position")
+        # print(curr_puckpusher_relative)
+        # print(curr_puckgoal_relative)
         
         # Goal
         # goal_tensor = self.goal_locations[:,0].clone()
         # normalized_goal_tensor = (goal_tensor - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
         goal_tensor_x = self.goal_locations[:,0].clone()
         # normalized_goal_tensor_x = (goal_tensor_x - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
-        normalized_goal_tensor_x = normalize(goal_tensor_x, self.goal_location_normmin, self.goal_location_normmax, -2, 2)
+        normalized_goal_tensor_x = normalize(goal_tensor_x, self.goal_location_normmin, self.goal_location_normmax, self.state_norm_min, self.state_norm_max)
         normalized_goal_tensor_x = normalized_goal_tensor_x.view(-1,1)
         goal_tensor_y = self.goal_locations[:,1].clone()
         # normalized_goal_tensor_y = (goal_tensor_y - self.goal_location_normmin) / (self.goal_location_normmax - self.goal_location_normmin)
-        normalized_goal_tensor_y = normalize(goal_tensor_y, self.goal_location_normmin, self.goal_location_normmax, -2, 2)
+        normalized_goal_tensor_y = normalize(goal_tensor_y, self.goal_location_normmin, self.goal_location_normmax, self.state_norm_min, self.state_norm_max)
         normalized_goal_tensor_y = normalized_goal_tensor_y.view(-1,1)
 
         # Properties
@@ -712,7 +764,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         dynamic_frictions_min = 0.05
         dynamic_frictions_max = 0.3
         # normalized_dynamic_frictions = (dynamic_frictions - dynamic_frictions_min) / (dynamic_frictions_max - dynamic_frictions_min)
-        normalized_dynamic_frictions = normalize(dynamic_frictions, dynamic_frictions_min, dynamic_frictions_max, -2, 2)
+        normalized_dynamic_frictions = normalize(dynamic_frictions, dynamic_frictions_min, dynamic_frictions_max, self.state_norm_min, self.state_norm_max)
         normalized_dynamic_frictions = normalized_dynamic_frictions.view(-1,1)
 
         # CoM
@@ -857,13 +909,16 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         
         # normalized_estimated_prop_rl = (denormalsied_estimated_prop - dynamic_frictions_min) / (dynamic_frictions_max - dynamic_frictions_min)
 
-
+        normalized_past_puckpusher_relative_obs = normalized_past_puckpusher_relative_obs.squeeze(0)
+        normalized_past_puckgoal_relative_obs = normalized_past_puckgoal_relative_obs.squeeze(0)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_com_x.view(-1, 1), norma        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)lized_com_y.view(-1, 1), normalized_dynamic_frictions.view(-1,1)), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, denormalsied_estimated_prop), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_prop_rl), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)        
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)        
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)   
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions, normalized_past_puckpusher_relative_obs, normalized_past_puckgoal_relative_obs), dim=1)        
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_dynamic_frictions), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions, estimation_errors), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_dynamic_frictions, estimation_errors), dim=1)        
@@ -1214,10 +1269,10 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Reset puck
         cylinderpuck2_default_state = self.cylinderpuck2.data.default_root_state.clone()[env_ids]
-        # pos_noise_x = sample_uniform(1.0, 1.4, (len(env_ids), 1), device=self.device)
-        # pos_noise_y = sample_uniform(-0.1, 0.1, (len(env_ids), 1), device=self.device)
-        # cylinderpuck2_default_state[:, 0] =  pos_noise_x.squeeze()
-        # cylinderpuck2_default_state[:, 1] =  pos_noise_y.squeeze()
+        pos_noise_x = sample_uniform(1.0, 1.5, (len(env_ids), 1), device=self.device)
+        pos_noise_y = sample_uniform(-0.05, 0.05, (len(env_ids), 1), device=self.device)
+        cylinderpuck2_default_state[:, 0] =  pos_noise_x.squeeze()
+        cylinderpuck2_default_state[:, 1] =  pos_noise_y.squeeze()
         cylinderpuck2_local_state = cylinderpuck2_default_state.clone()
         cylinderpuck2_default_state[:, 0:3] = (
             cylinderpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
@@ -1231,7 +1286,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         cuboidpusher2_default_state = self.cuboidpusher2.data.default_root_state.clone()[env_ids]
         pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
         # cuboidpusher2_default_state[:, 0] = cylinderpuck2_local_state[:, 0]+0.1
-        # cuboidpusher2_default_state[:, 1] = cylinderpuck2_local_state[:, 1]+0.1
+        # cuboidpusher2_default_state[:, 1] = cylinderpuck2_local_state[:, 1]
         cuboidpusher2_default_state[:, 0:3] = (
             cuboidpusher2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
         )
