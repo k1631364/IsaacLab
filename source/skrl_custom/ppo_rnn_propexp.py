@@ -433,6 +433,9 @@ class PPO_RNN_PROPEXP(Agent):
         # print(self._state_preprocessor(states).shape)
 
         # print("Agent act called")
+        # print("Check state values")
+        # print(states.shape)
+        # print(self._state_preprocessor(states).shape)
         actions, log_prob, outputs = self.policy.act({"states": self._state_preprocessor(states), **rnn}, role="policy")
         self._current_log_prob = log_prob
 
