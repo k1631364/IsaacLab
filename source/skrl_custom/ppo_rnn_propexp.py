@@ -536,11 +536,11 @@ class PPO_RNN_PROPEXP(Agent):
             # self.memory.add_samples(states=selected_states, actions=selected_actions, rewards=selected_rewards, next_states=selected_next_states,
             #                         terminated=selected_terminated, truncated=selected_truncated, log_prob=selected_current_log_prob, values=selected_values)
 
-            task_phase = infos["prop_estimation"]["task_phase"].view(-1,1)
-            # self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
-            #                         terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
+            # task_phase = infos["prop_estimation"]["task_phase"].view(-1,1)
             self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
-                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, task_phase=task_phase, **rnn_states)
+                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)
+            # self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
+            #                         terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, task_phase=task_phase, **rnn_states)
             for memory in self.secondary_memories:
                 memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
                                    terminated=terminated, truncated=truncated, log_prob=self._current_log_prob, values=values, **rnn_states)

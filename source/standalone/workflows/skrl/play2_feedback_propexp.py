@@ -262,12 +262,16 @@ def main():
             # agent stepping
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
             actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs, infos, timestep=0, timesteps=0)
+            # actions_task = outputs_task["mean_actions"]
             # print(actions.shape)
             # print(outputs["mean_actions"].shape)
             obs_exp = obs[:, :exp_observation_space]
             actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
+            # actions_exp = outputs_exp["mean_actions"]
 
+            # actions = actions_task
             actions = actions_exp
+            # actions_task = torch.zeros_like(actions_exp)
             if "prop_estimation" in infos: 
                 # print("curr rmse")
                 # print(infos["prop_estimation"]["curr_rmse"])
@@ -277,6 +281,9 @@ def main():
                 # print(actions.shape)
                 # print(actions2.shape)
                 task_phase = infos["prop_estimation"]["task_phase"].to(env.device)
+                print(task_phase)
+                print(infos["prop_estimation"]["curr_rmse"])
+                print(obs)
                 final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_exp)
                 actions = final_actions
             
