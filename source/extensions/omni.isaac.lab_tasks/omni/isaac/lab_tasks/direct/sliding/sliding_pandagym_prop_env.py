@@ -343,7 +343,7 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
 
     decimation = 5
-    episode_length_s = 5.0
+    episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
     num_observations = 12
@@ -547,6 +547,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.denormalsied_output = None
         self.denormalsied_target = None
         self.prop_rmse_eachenv = None       
+
+        self.transition_to_task_idx = None
 
     def _setup_scene(self):
         # print("Env setup scene called!!!!")
@@ -976,6 +978,10 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # print(prop_rmse_eachenv) 
 
+    def _get_transition_to_task_idx(self, transition_to_task_idx: Sequence[int]) -> None:
+        # print("hello")
+        self.transition_to_task_idx = transition_to_task_idx
+
     def _get_rewards(self) -> torch.Tensor:
         # print("Env get rewards called!!!!")
 
@@ -1130,7 +1136,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # print(self.task_phase)
 
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds | out_of_bounds_min_puck_velx     
-        out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
+        # out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
+        out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds      
 
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 
@@ -1157,10 +1164,10 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         #     print("out_of_bounds_max_puck_posx") 
         # if out_of_bounds_min_puck_posx[0]: 
         #     print("out_of_bounds_min_puck_posx") 
-        # if overshoot_max_puck_posx[0]: 
-        #     print("overshoot_max_puck_posx")  
-        # if self.goal_bounds[0]: 
-        #     print("goal_bounds")    
+        # # if overshoot_max_puck_posx[0]: 
+        # #     print("overshoot_max_puck_posx")  
+        # # if self.goal_bounds[0]: 
+        # #     print("goal_bounds")    
         # if out_of_bounds_min_puck_velx[0]: 
         #     print("out_of_bounds_min_puck_velx")   
 
@@ -1171,7 +1178,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         true_tensor = torch.ones(self.scene.num_envs, dtype=torch.bool)
 
         # episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
-        episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out | out_of_bounds_min_puck_velx
+        # episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out | out_of_bounds_min_puck_velx
+        episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out 
 
         done_info = {}
         done_info = {
@@ -1183,8 +1191,46 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         return out_of_bounds, time_out, self.goal_bounds, episode_failed, done_info
         # return false_tensor, time_out, self.goal_bounds, episode_failed
 
+    def _reset_expend(self, env_ids: Sequence[int] | None): 
+        # Reset puck
+        cylinderpuck2_default_state = self.cylinderpuck2.data.default_root_state.clone()[env_ids]
+        # pos_noise_x = sample_uniform(1.0, 1.4, (len(env_ids), 1), device=self.device)
+        # pos_noise_y = sample_uniform(-0.05, 0.05, (len(env_ids), 1), device=self.device)
+        # cylinderpuck2_default_state[:, 0] =  pos_noise_x.squeeze()
+        # cylinderpuck2_default_state[:, 1] =  pos_noise_y.squeeze()
+        cylinderpuck2_local_state = cylinderpuck2_default_state.clone()
+        cylinderpuck2_default_state[:, 0:3] = (
+            cylinderpuck2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
+        )
+        cylinderpuck2_default_state[:, 7:] = torch.zeros_like(self.cylinderpuck2.data.default_root_state[env_ids, 7:])
+        # cylinderpuck2_default_state[:, 7] = -1.0
+        self.cylinderpuck2_state[env_ids] = cylinderpuck2_default_state.clone()
+        self.cylinderpuck2.write_root_state_to_sim(cylinderpuck2_default_state, env_ids)
+
+        # Reset pusher
+        cuboidpusher2_default_state = self.cuboidpusher2.data.default_root_state.clone()[env_ids]
+        # # pos_noise = sample_uniform(-10.0, 10.0, (len(env_ids), 3), device=self.device)
+        # pos_noise_x = sample_uniform(1.1, 1.6, (len(env_ids), 1), device=self.device)
+        # pos_noise_y = sample_uniform(-0.05, 0.05, (len(env_ids), 1), device=self.device)
+        # # cuboidpusher2_default_state[:, 0] = cylinderpuck2_local_state[:, 0]+0.1
+        # # cuboidpusher2_default_state[:, 1] = cylinderpuck2_local_state[:, 1]
+        # cuboidpusher2_default_state[:, 0] =  pos_noise_x.squeeze()
+        # cuboidpusher2_default_state[:, 1] =  pos_noise_y.squeeze()
+        cuboidpusher2_default_state[:, 0:3] = (
+            cuboidpusher2_default_state[:, 0:3] + self.scene.env_origins[env_ids]
+        )
+        cuboidpusher2_default_state[:, 7:] = torch.zeros_like(self.cuboidpusher2.data.default_root_state[env_ids, 7:])
+        self.cuboidpusher2_state[env_ids] = cuboidpusher2_default_state.clone()
+        self.cuboidpusher2.write_root_state_to_sim(cuboidpusher2_default_state, env_ids)
+
+        # return self._get_observations()
+
+
     def _reset_idx(self, env_ids: Sequence[int] | None):
         # print("Env reset idx called!!!!")
+
+        # print("Reset env ids")
+        # print(env_ids.shape)
 
         if env_ids is None:
             env_ids = self.cylinderpuck2._ALL_INDICES

@@ -315,6 +315,11 @@ class DirectRLEnvFeedback(DirectRLEnv):
         self.reset_buf = self.reset_terminated | self.reset_time_outs
         self.reward_buf = self._get_rewards()
 
+        # print("transition_to_task_idx")
+        # print(self.transition_to_task_idx)
+        if self.transition_to_task_idx is not None: 
+            self._reset_expend(self.transition_to_task_idx)
+
         # -- reset envs that terminated/timed-out and log the episode information
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:

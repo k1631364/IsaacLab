@@ -236,6 +236,9 @@ def main():
     # set agent to evaluation mode
     agent.set_running_mode("eval")
 
+    prev_task_phase = torch.zeros(env.num_envs, dtype=torch.bool).to(env.device)
+    curr_task_phase = torch.zeros(env.num_envs, dtype=torch.bool).to(env.device)
+
     # # set default values
     # import copy
     # wandb_kwargs = copy.deepcopy(experiment_cfg)
@@ -256,22 +259,27 @@ def main():
     obs, infos = env.reset()
     prev_total_episode_num = 0
     # simulate environment
+    curr_task_change = False
+    task_change_num = 0
+    transition_rest_counter = torch.zeros(env.num_envs, dtype=torch.int32).to(env.device)
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
             actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs, infos, timestep=0, timesteps=0)
-            # actions_task = outputs_task["mean_actions"]
+            actions_task = outputs_task["mean_actions"]
             # print(actions.shape)
             # print(outputs["mean_actions"].shape)
             obs_exp = obs[:, :exp_observation_space]
             actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
-            # actions_exp = outputs_exp["mean_actions"]
+            actions_exp = outputs_exp["mean_actions"]
 
             # actions = actions_task
             actions = actions_exp
             # actions_task = torch.zeros_like(actions_exp)
+            # actions_exp = torch.zeros_like(actions_exp)
+            actions_rest = torch.zeros_like(actions_exp)
             if "prop_estimation" in infos: 
                 # print("curr rmse")
                 # print(infos["prop_estimation"]["curr_rmse"])
@@ -280,12 +288,28 @@ def main():
                 # print(infos["prop_estimation"]["goal_bounds_exp"].shape)
                 # print(actions.shape)
                 # print(actions2.shape)
-                task_phase = infos["prop_estimation"]["task_phase"].to(env.device)
-                print(task_phase)
-                print(infos["prop_estimation"]["curr_rmse"])
-                print(obs)
-                final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_exp)
+                curr_task_phase = infos["prop_estimation"]["task_phase"].to(env.device)
+                transition_rest_counter = transition_rest_counter + curr_task_phase.int()
+                task_phase = transition_rest_counter > 5
+                transition_rest_counter[~curr_task_phase] = 0
+                # print(curr_task_phase)
+                # print(task_phase)
+                # print("task phase shape")
+                # print(task_phase.shape)
+                # print("Current task phase")
+                # print(task_phase)
+                # print("Current timestep")
+                # print(env.episode_length_buf.shape)
+                # curr_task_phase = torch.ones(env.num_envs, dtype=torch.bool).to(env.device)
+                # curr_task_phase = env.episode_length_buf > 5
+                # print(infos["prop_estimation"]["curr_rmse"])
+                # print(obs)
+                final_actions = torch.where(curr_task_phase.unsqueeze(1), actions_task, actions_exp)
+                # final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_rest)
+                # final_actions = torch.where(curr_task_phase.unsqueeze(1), final_actions, actions_exp)
                 actions = final_actions
+            else: 
+                actions = torch.zeros_like(actions_exp)
             
             # actions2 = outputs["mean_actions"]
             # get prop estimate
@@ -295,8 +319,32 @@ def main():
             # print(prop_info)
             env._get_estimation(prop_info)
 
+            transition_to_task = (~prev_task_phase) & curr_task_phase
+            prev_task_phase = curr_task_phase
+            transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
+            env._get_transition_to_task_idx(transition_to_task_idx)
+
             # env stepping
             obs, _, _, _, infos = env.step(actions)
+
+            # Check change from exploration to task phase
+            # transition_to_task = (~prev_task_phase) & curr_task_phase
+            # prev_task_phase = curr_task_phase
+            # transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
+            # print("Check transition")
+            # print(transition_to_task)
+            if transition_to_task[0]: 
+                # print("transition")
+                curr_task_change = True
+            # print(transition_to_task_idx)
+            # obs = env._reset_expend(transition_to_task_idx)["policy"]
+            # obs = env._get_observations()["policy"]
+
+            # print("Obs")
+            # print(obs.shape)
+            # print("get obs")
+            # print(env._reset_expend(transition_to_task_idx)["policy"].shape)
+
             # print("Infos keys")
             # print(infos.keys())
             # print(prop_estimator_output.keys())
@@ -309,6 +357,8 @@ def main():
             # print("Should be same as GroundTruth")
             # print(prop_estimator_output["denormalsied_target"])
             # print(infos["prop"].shape)  # (num_envs, num_char)
+
+
 
 
             # infos["log"] = {"tttt": torch.tensor(3.14)}
@@ -333,6 +383,14 @@ def main():
                 print(success_rate_1env)
                 # wandb.log({"Episode_num": total_episode_num})  
                 # wandb.log({"success_rate": success_rate_1env}) 
+
+                print(curr_task_change)
+                if curr_task_change: 
+                    task_change_num+=1
+                task_change_rate = (task_change_num/total_episode_num)*100.0
+                # print("Task switch num")
+                # print(task_change_num)
+                # print(task_change_rate)
 
                 if "log" in infos and "end_rmse" in infos["log"]:
                     end_rmse = infos["log"]["end_rmse"]
