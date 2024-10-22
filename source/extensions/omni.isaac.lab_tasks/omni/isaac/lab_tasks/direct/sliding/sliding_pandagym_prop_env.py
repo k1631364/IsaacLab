@@ -292,7 +292,7 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     goal_location = [0.5, 0.0, 1.0]
     goal_length = 0.1
     max_puck_goalcount = 10
-    max_estimation_goalcount = 5
+    max_estimation_goalcount = 4
 
     # markergoal1_cfg = VisualizationMarkersCfg(
     #     prim_path="/Visual/Goal1",
@@ -954,9 +954,17 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         
         return observations
 
-    def _get_estimation(self, prop_info: dict) -> None:
-        # Call the parent class's _get_estimation method
-        super()._get_estimation(prop_info)
+    def _get_estimation(self) -> dict:
+        prop_info = {
+            "rnn_rmse": self.rnn_rmse, 
+            "denormalsied_output": self.denormalsied_output, 
+            "denormalsied_target": self.denormalsied_target
+        }
+        return prop_info
+    
+    def _set_estimation(self, prop_info: dict) -> None:
+        # Call the parent class's _set_estimation method
+        super()._set_estimation(prop_info)
         
         # prop info
         # print("Prop info")

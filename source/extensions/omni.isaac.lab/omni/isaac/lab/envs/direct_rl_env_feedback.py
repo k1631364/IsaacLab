@@ -265,7 +265,7 @@ class DirectRLEnvFeedback(DirectRLEnv):
         # return observations
         return obs, self.extras
 
-    def _get_estimation(self, prop_info: dict) -> None: 
+    def _set_estimation(self, prop_info: dict) -> None: 
         # print("Get estimation")
         # print(prop_info)
         self.prop_info = prop_info

@@ -62,6 +62,11 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import get_checkpoint_path, load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.skrl import SkrlVecEnvWrapper, process_skrl_cfg
 
+# def normalize(tensor, min_val, max_val, new_min, new_max):
+#     return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
+
+def normalize(tensor, min_val, max_val, new_min, new_max):
+    return (tensor - min_val) / (max_val - min_val) * (new_max - new_min) + new_min
 
 def main():
     """Play with skrl agent."""
@@ -261,25 +266,29 @@ def main():
     # simulate environment
     curr_task_change = False
     task_change_num = 0
+    exp_failed_num = 0
     transition_rest_counter = torch.zeros(env.num_envs, dtype=torch.int32).to(env.device)
+    expend_prop_info = torch.zeros((env.num_envs, 1)).to(env.device)
+    normalised_expend_prop_info = None
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
-            # agent stepping
-            # actions = agent.act(obs, timestep=0, timesteps=0)[0]
-            actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs, infos, timestep=0, timesteps=0)
-            actions_task = outputs_task["mean_actions"]
-            # print(actions.shape)
-            # print(outputs["mean_actions"].shape)
-            obs_exp = obs[:, :exp_observation_space]
-            actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
-            actions_exp = outputs_exp["mean_actions"]
+            
+            # # agent stepping
+            # # actions = agent.act(obs, timestep=0, timesteps=0)[0]
+            # actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs, infos, timestep=0, timesteps=0)
+            # actions_task = outputs_task["mean_actions"]
+            # # print(actions.shape)
+            # # print(outputs["mean_actions"].shape)
+            # obs_exp = obs[:, :exp_observation_space]
+            # actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
+            # actions_exp = outputs_exp["mean_actions"]
 
             # actions = actions_task
-            actions = actions_exp
+            # actions = actions_exp
             # actions_task = torch.zeros_like(actions_exp)
             # actions_exp = torch.zeros_like(actions_exp)
-            actions_rest = torch.zeros_like(actions_exp)
+            # actions_rest = torch.zeros_like(actions_exp)
             if "prop_estimation" in infos: 
                 # print("curr rmse")
                 # print(infos["prop_estimation"]["curr_rmse"])
@@ -304,12 +313,73 @@ def main():
                 # curr_task_phase = env.episode_length_buf > 5
                 # print(infos["prop_estimation"]["curr_rmse"])
                 # print(obs)
-                final_actions = torch.where(curr_task_phase.unsqueeze(1), actions_task, actions_exp)
-                # final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_rest)
-                # final_actions = torch.where(curr_task_phase.unsqueeze(1), final_actions, actions_exp)
-                actions = final_actions
-            else: 
-                actions = torch.zeros_like(actions_exp)
+                # print(curr_task_phase)
+
+            transition_to_task = (~prev_task_phase) & curr_task_phase
+            prev_task_phase = curr_task_phase
+            transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
+            env._get_transition_to_task_idx(transition_to_task_idx)
+
+            curr_prop_info = env._get_estimation()["denormalsied_output"]
+            # print("prop")
+            # print(curr_task_phase)
+            if curr_prop_info is not None: 
+                transition_mask = transition_to_task.unsqueeze(1)
+                expend_prop_info = torch.where(transition_mask, curr_prop_info, expend_prop_info) 
+                # print("prop")
+                # print(curr_prop_info[0,0])
+                # print("current prop info")
+                # print(expend_prop_info.shape)
+                dynamic_frictions_min = 0.05
+                dynamic_frictions_max = 0.3
+                state_norm_min = -2
+                state_norm_max = 2
+
+                # Normalize the entire tensor (broadcasting works here)
+                normalised_expend_prop_info = normalize(expend_prop_info, dynamic_frictions_min, dynamic_frictions_max, state_norm_min, state_norm_max)
+                
+            # print("Check")
+            # print(curr_task_phase)
+            # print(obs[:,11])
+            obs_task = obs
+            if normalised_expend_prop_info is not None: 
+                obs_task[curr_task_phase, 11] = normalised_expend_prop_info[curr_task_phase, 0]
+
+            # print(obs_task[:,11])
+
+            # Compute action
+            # actions = agent.act(obs, timestep=0, timesteps=0)[0]
+            actions_task, log_prob_task, outputs_task, prop_estimator_output_task = agent.act(obs_task, infos, timestep=0, timesteps=0)
+            actions_task = outputs_task["mean_actions"]
+            # print(actions.shape)
+            # print(outputs["mean_actions"].shape)
+            obs_exp = obs[:, :exp_observation_space]
+            actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
+            actions_exp = outputs_exp["mean_actions"]
+
+            final_actions = torch.where(curr_task_phase.unsqueeze(1), actions_task, actions_exp)
+            # final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_rest)
+            # final_actions = torch.where(curr_task_phase.unsqueeze(1), final_actions, actions_exp)
+            actions = final_actions
+            # else: 
+            #     # actions = torch.zeros_like(actions_exp)
+            #     # print(env.action_space.shape[0])
+            #     actions = torch.zeros((env.num_envs, env.action_space.shape[0])).to(env.device)
+ 
+            # transition_to_task = (~prev_task_phase) & curr_task_phase
+            # prev_task_phase = curr_task_phase
+            # transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
+            # env._get_transition_to_task_idx(transition_to_task_idx)
+
+            # curr_prop_info = env._get_estimation()["denormalsied_output"]
+            # if curr_prop_info is not None: 
+            #     transition_mask = transition_to_task.unsqueeze(1)
+            #     expend_prop_info = torch.where(transition_mask, curr_prop_info, expend_prop_info) 
+            # # print(expend_prop_info)
+
+            # if curr_task_change: 
+            #     curr_prop_info = env._get_estimation()
+            #     # print(curr_prop_info["denormalsied_output"].shape) 
             
             # actions2 = outputs["mean_actions"]
             # get prop estimate
@@ -317,12 +387,12 @@ def main():
             prop_info["prop_estimator_output"] = prop_estimator_output_exp
             # print("Prop info")
             # print(prop_info)
-            env._get_estimation(prop_info)
+            env._set_estimation(prop_info)
 
-            transition_to_task = (~prev_task_phase) & curr_task_phase
-            prev_task_phase = curr_task_phase
-            transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
-            env._get_transition_to_task_idx(transition_to_task_idx)
+            # transition_to_task = (~prev_task_phase) & curr_task_phase
+            # prev_task_phase = curr_task_phase
+            # transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
+            # env._get_transition_to_task_idx(transition_to_task_idx)
 
             # env stepping
             obs, _, _, _, infos = env.step(actions)
@@ -381,24 +451,32 @@ def main():
                 print(infos["log_eval"]["num_success"])
                 print(infos["log_eval"]["num_failure"])
                 print(success_rate_1env)
+                success_rate_allenv = infos["log"]["success_rate"]
+                print("All env success rate")
+                print(success_rate_allenv)
                 # wandb.log({"Episode_num": total_episode_num})  
                 # wandb.log({"success_rate": success_rate_1env}) 
 
                 print(curr_task_change)
                 if curr_task_change: 
                     task_change_num+=1
+                else: 
+                    exp_failed_num+=1
                 task_change_rate = (task_change_num/total_episode_num)*100.0
                 # print("Task switch num")
                 # print(task_change_num)
                 # print(task_change_rate)
+                curr_task_change = False
+                print("Exp failed num")
+                print(exp_failed_num)
 
                 if "log" in infos and "end_rmse" in infos["log"]:
                     end_rmse = infos["log"]["end_rmse"]
                     # print(infos["log"]["end_rmse"])
                     # print(end_rmse)       
-                    wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env, "end_rmse": end_rmse})
+                    wandb.log({"episode_num": total_episode_num, "success_rate_1env": success_rate_1env, "success_rate_allenv": success_rate_allenv, "end_rmse": end_rmse})
                 else: 
-                    wandb.log({"episode_num": total_episode_num, "success_rate": success_rate_1env})
+                    wandb.log({"episode_num": total_episode_num, "success_rate_1env": success_rate_1env, "success_rate_allenv": success_rate_allenv})
                 prev_total_episode_num = total_episode_num 
 
             # print(total_episode_num)
