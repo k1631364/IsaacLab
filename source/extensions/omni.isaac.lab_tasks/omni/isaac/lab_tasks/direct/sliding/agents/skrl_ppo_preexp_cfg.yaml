@@ -122,12 +122,10 @@ prop_estimator:
   # Second iteration (eval)
   pre_trained: True
   # pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-20_22-13-43/checkpoints_prop/LSTM_best.pth"
-  # pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_11-20-04/checkpoints_prop/LSTM_best.pth"
-  pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_19-58-23/checkpoints_prop/LSTM_best.pth"
+  pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_11-20-04/checkpoints_prop/LSTM_best.pth"
   freeze_weights: True
   # pre_trained_policy_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-20_22-13-43/checkpoints/best_agent.pt"
-  # pre_trained_policy_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_11-20-04/checkpoints/best_agent.pt"
-  pre_trained_policy_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_19-58-23/checkpoints/best_agent.pt"
+  pre_trained_policy_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-23_11-20-04/checkpoints/best_agent.pt"
   pre_trained_observation_space: 11
   pre_trained_action_space: 2
   policy_switch: False

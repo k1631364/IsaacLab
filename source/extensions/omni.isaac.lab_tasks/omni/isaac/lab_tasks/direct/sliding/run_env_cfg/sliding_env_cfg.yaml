@@ -1,3 +1,4 @@
 
-train_model: "test"
+train_model: "train" # "train" # "test"
 test_mode: "exponly" # "exponly" # "exptask" # "taskonly"
+# # test_mode: "taskonly_train"
