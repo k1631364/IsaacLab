@@ -18,6 +18,7 @@ from .sliding_pandagym_env import SlidingPandaGymEnv, SlidingPandaGymEnvCfg
 from .sliding_pandagym_exp_env import SlidingPandaGymExpEnv, SlidingPandaGymExpEnvCfg
 from .sliding_pandagym_embedding_env import SlidingPandaGymEmbeddingEnv, SlidingPandaGymEmbeddingEnvCfg
 from .sliding_pandagym_prop_env import SlidingPandaGymPropEnv, SlidingPandaGymPropEnvCfg
+from .sliding_pandagym_exp2_env import SlidingPandaGymExp2Env, SlidingPandaGymExp2EnvCfg
 
 ##
 # Register Gym environments.
@@ -128,3 +129,18 @@ gym.register(
         "sb3_cfg_entry_point": f"{agents.__name__}:sb3_ppo_cfg.yaml",
     },
 )
+
+# gym.register(
+#     id="Isaac-Sliding-Direct-v8",
+#     entry_point="omni.isaac.lab_tasks.direct.sliding:SlidingPandaGymExp2Env",
+#     disable_env_checker=True,
+#     kwargs={
+#         "env_cfg_entry_point": SlidingPandaGymExp2EnvCfg,
+#         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
+#         "rsl_rl_cfg_entry_point": agents.rsl_rl_ppo_cfg.CartpolePPORunnerCfg,
+#         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_franka_cfg.yaml",
+#         "skrl_exp_cfg_entry_point": f"{agents.__name__}:skrl_ppo_preexp_cfg.yaml",
+#         "sb3_cfg_entry_point": f"{agents.__name__}:sb3_ppo_cfg.yaml",
+#     },
+# )
+

@@ -214,7 +214,7 @@ class SkrlSequentialLogTrainer_Feedback(Trainer):
             prop_info["prop_estimator_output"] = prop_estimator_output
             
             # step the environments
-            self.env._get_estimation(prop_info)
+            self.env._set_estimation(prop_info)
             next_states, rewards, terminated, truncated, infos = self.env.step(actions)
             # note: here we do not call render scene since it is done in the env.step() method
             # record the environments' transitions

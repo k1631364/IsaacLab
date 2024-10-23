@@ -113,7 +113,7 @@ class EventCfg:
   # Juan's pushing randomisation: distribution_parameters: [[0.5, 0.2, 0.4], [0.7, 0.4, 0.6]]
 
 @configclass
-class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
+class SlidingPandaGymExp2EnvCfg(DirectRLEnvCfg):
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120)
 
@@ -292,7 +292,7 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     goal_location = [0.5, 0.0, 1.0]
     goal_length = 0.1
     max_puck_goalcount = 10
-    max_estimation_goalcount = 5
+    max_estimation_goalcount = 4
 
     # markergoal1_cfg = VisualizationMarkersCfg(
     #     prim_path="/Visual/Goal1",
@@ -363,10 +363,10 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     rew_scale_timestep = 0.001
     rew_scale_pushervel = -0.1
 
-class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
-    cfg: SlidingPandaGymPropEnvCfg
+class SlidingPandaGymExp2Env(DirectRLEnvFeedback):
+    cfg: SlidingPandaGymExp2EnvCfg
 
-    def __init__(self, cfg: SlidingPandaGymPropEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: SlidingPandaGymExp2EnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
 
@@ -963,6 +963,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         return prop_info
     
     def _set_estimation(self, prop_info: dict) -> None:
+        # print("Set estimation called")
         # Call the parent class's _set_estimation method
         super()._set_estimation(prop_info)
         

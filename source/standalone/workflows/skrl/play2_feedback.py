@@ -207,7 +207,7 @@ def main():
             prop_info["prop_estimator_output"] = prop_estimator_output
             # print("Prop info")
             # print(prop_info)
-            env._get_estimation(prop_info)
+            env._set_estimation(prop_info)
 
             if "prop_estimation" in infos: 
                 # print("curr rmse")

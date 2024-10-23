@@ -348,6 +348,8 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         self.denormalsied_target = None
         self.prop_rmse_eachenv = None
 
+        self.transition_to_task_idx = None
+
         # ### Prop estimation (offline) ###
 
         # # Load the learnt model info
@@ -725,9 +727,10 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         
         return observations
 
-    def _get_estimation(self, prop_info: dict) -> None:
+    def _set_estimation(self, prop_info: dict) -> None:
+        # print("Set estimation called")
         # Call the parent class's _get_estimation method
-        super()._get_estimation(prop_info)
+        super()._set_estimation(prop_info)
         
         # prop info
         # print("Prop info")
@@ -942,6 +945,8 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
             tensor[0, selected_envs, :] = 0 # 0  # Here, 0 is for dim0, `selected_envs` is for dim1, and `:` is for dim2
         
         if self.denormalsied_output is not None: 
+            self.denormalsied_output = self.denormalsied_output.clone()
+            self.denormalsied_target = self.denormalsied_target.clone()
             self.denormalsied_output[selected_envs, :] = 1.0
             self.denormalsied_target[selected_envs, :] = 1.0
             self.prop_rmse_eachenv[selected_envs] = 1.0
