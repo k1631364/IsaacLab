@@ -315,6 +315,33 @@ class DirectRLEnvFeedback(DirectRLEnv):
         self.reset_buf = self.reset_terminated | self.reset_time_outs
         self.reward_buf = self._get_rewards()
 
+        success_tensor = self.goal_reached
+        failed_tensor = self.episode_failed
+
+        # Update record_tensor based on success_tensor and failed_tensor
+        self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+        self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
+
+        end_rmse_record_mean = 0.0
+        if "curr_rmse" in done_info: 
+            curr_rmse = done_info["curr_rmse"]
+            # print(curr_rmse.shape)
+            end_tensor = success_tensor | failed_tensor
+            # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+            self.end_rmse_record = torch.where(end_tensor, curr_rmse, self.end_rmse_record)
+            # print("End")
+            # print(end_tensor)
+            # print(curr_rmse)
+            # print(self.end_rmse_record)
+            # print(self.end_rmse_record)
+            # print(self.end_rmse_record.mean())
+            end_rmse_record_mean = self.end_rmse_record.mean()
+            # print(end_rmse_record_mean)
+
+            self.extras["prop_estimation"] = {
+                "curr_rmse": done_info["curr_rmse"], 
+            } 
+
         # print("transition_to_task_idx")
         # print(self.transition_to_task_idx)
         if self.transition_to_task_idx is not None: 
@@ -345,28 +372,28 @@ class DirectRLEnvFeedback(DirectRLEnv):
         # self.goal_reached
         # print(self.episode_failed)      
 
-        success_tensor = self.goal_reached
-        failed_tensor = self.episode_failed
+        # success_tensor = self.goal_reached
+        # failed_tensor = self.episode_failed
 
-        # Update record_tensor based on success_tensor and failed_tensor
-        self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
-        self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
+        # # Update record_tensor based on success_tensor and failed_tensor
+        # self.success_record = torch.where(success_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+        # self.success_record = torch.where(failed_tensor, torch.tensor(False, dtype=torch.bool), self.success_record)
 
-        end_rmse_record_mean = 0.0
-        if "curr_rmse" in done_info: 
-            curr_rmse = done_info["curr_rmse"]
-            # print(curr_rmse.shape)
-            end_tensor = success_tensor | failed_tensor
-            # print(end_tensor.shape)
-            # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
-            self.end_rmse_record = torch.where(end_tensor, curr_rmse, self.end_rmse_record)
-            # print(self.end_rmse_record)
-            # print(self.end_rmse_record.mean())
-            end_rmse_record_mean = self.end_rmse_record.mean()
+        # end_rmse_record_mean = 0.0
+        # if "curr_rmse" in done_info: 
+        #     curr_rmse = done_info["curr_rmse"]
+        #     # print(curr_rmse.shape)
+        #     end_tensor = success_tensor | failed_tensor
+        #     # print(end_tensor.shape)
+        #     # self.end_rmse_record = torch.where(end_tensor, torch.tensor(True, dtype=torch.bool), self.success_record)
+        #     self.end_rmse_record = torch.where(end_tensor, curr_rmse, self.end_rmse_record)
+        #     # print(self.end_rmse_record)
+        #     # print(self.end_rmse_record.mean())
+        #     end_rmse_record_mean = self.end_rmse_record.mean()
 
-            self.extras["prop_estimation"] = {
-                "curr_rmse": done_info["curr_rmse"], 
-            } 
+        #     self.extras["prop_estimation"] = {
+        #         "curr_rmse": done_info["curr_rmse"], 
+        #     } 
 
         if "goal_bounds_exp" in done_info: 
             self.extras["prop_estimation"]["goal_bounds_exp"] = done_info["goal_bounds_exp"]

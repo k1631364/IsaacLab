@@ -20,6 +20,8 @@ from .sliding_pandagym_embedding_env import SlidingPandaGymEmbeddingEnv, Sliding
 from .sliding_pandagym_prop_env import SlidingPandaGymPropEnv, SlidingPandaGymPropEnvCfg
 from .sliding_pandagym_exp2_env import SlidingPandaGymExp2Env, SlidingPandaGymExp2EnvCfg
 
+from . import run_env_cfg
+
 ##
 # Register Gym environments.
 ##
@@ -127,6 +129,7 @@ gym.register(
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_franka_cfg.yaml",
         "skrl_exp_cfg_entry_point": f"{agents.__name__}:skrl_ppo_preexp_cfg.yaml",
         "sb3_cfg_entry_point": f"{agents.__name__}:sb3_ppo_cfg.yaml",
+        "run_env_cfg": "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/direct/sliding/run_env_cfg/sliding_env_cfg.yaml"
     },
 )
 

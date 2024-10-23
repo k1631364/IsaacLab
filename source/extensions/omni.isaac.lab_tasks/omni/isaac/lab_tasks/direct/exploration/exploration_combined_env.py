@@ -291,8 +291,11 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
         self.object_location_normmin = -2.0
         self.object_vel_normmax = 3.0
         self.object_vel_normmin = -3.0
-        self.object_rot_normmax = 2.0
-        self.object_rot_normmin = -2.0
+        self.object_rot_normmax = 1.0
+        self.object_rot_normmin = -1.0
+
+        self.yaw_min_check = 1000000
+        self.yaw_max_check = -1000000
 
         # Success rate tracking
         self.success_rates = []
@@ -618,7 +621,28 @@ class ExplorationCombinedEnv(DirectRLEnvFeedback):
 
         # Offline prop estimation
 
-        curr_obs_prop = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y), dim=1)
+        # print("Rot")
+        # print(curr_cylinderpuck2_state[:, 6].view(-1,1))
+        # print("Normalised yaw")
+        # print(normalized_past_puck_rot_obs_yaw)
+        # if torch.min(curr_cylinderpuck2_state[:, 6]) < self.yaw_min_check: 
+        #     self.yaw_min_check = torch.min(curr_cylinderpuck2_state[:, 6]) 
+        # if torch.max(curr_cylinderpuck2_state[:, 6]) > self.yaw_min_check: 
+        #     self.yaw_max_check = torch.max(curr_cylinderpuck2_state[:, 6]) 
+        # Get min and max of the specific column once
+        # min_yaw = torch.min(curr_cylinderpuck2_state[:, 6])
+        # max_yaw = torch.max(curr_cylinderpuck2_state[:, 6])
+        # if min_yaw < self.yaw_min_check:
+        #     self.yaw_min_check = min_yaw.item()  # Use .item() to convert tensor to Python number
+
+        # if max_yaw > self.yaw_max_check:
+        #     self.yaw_max_check = max_yaw.item()  # Use .item() to convert tensor to Python number
+        # print("Yaw min max check")
+        # print(self.yaw_min_check)
+        # print(self.yaw_max_check)
+        
+        # curr_obs_prop = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y), dim=1)
+        curr_obs_prop = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y), dim=1)
         self.past_obs_prop.append(curr_obs_prop.unsqueeze(0))
         self.past_obs_prop = self.past_obs_prop[-self.past_timestep_prop:]
         past_obs_prop_tensor = torch.cat(self.past_obs_prop, dim=0)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import torch
+import yaml
 from collections.abc import Sequence
 
 from omni.isaac.lab_assets.cartpole import CARTPOLE_CFG
@@ -369,6 +370,17 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
     def __init__(self, cfg: SlidingPandaGymPropEnvCfg, render_mode: str | None = None, **kwargs):
         # print("Env init called!!!!")
         super().__init__(cfg, render_mode, **kwargs)
+        
+        # print("Received kwargs:", kwargs)
+        # print(kwargs["run_env_cfg"])
+        # self.test_mode = "taskonly"
+
+        # Load run env config
+        run_env_cfg_path = kwargs["run_env_cfg"]
+        with open(run_env_cfg_path, 'r') as file:
+            run_env_cfg = yaml.safe_load(file)
+        self.test_mode = run_env_cfg["test_mode"]
+        self.train_model = run_env_cfg["train_model"]
 
         self.action_scale = self.cfg.action_scale
 
@@ -433,8 +445,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.object_location_normmin = -2.0
         self.object_vel_normmax = 3.0
         self.object_vel_normmin = -3.0
-        self.object_rot_normmax = 2.0
-        self.object_rot_normmin = -2.0
+        self.object_rot_normmax = 1.0
+        self.object_rot_normmin = -1.0
 
         # Success rate tracking
         self.success_rates = []
@@ -1143,9 +1155,16 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # print("Task phase checker")
         # print(self.task_phase)
 
+        if self.test_mode == "exponly": 
+            self.goal_bounds = self.goal_bounds_exp
+
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds | out_of_bounds_min_puck_velx     
         # out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
-        out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds      
+
+        if self.train_model == "test": 
+            out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds      
+        else: 
+            out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
 
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 
@@ -1187,7 +1206,11 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # episode_failed = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | time_out | out_of_bounds_min_puck_velx
         # episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out | out_of_bounds_min_puck_velx
-        episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out 
+        
+        if self.train_model == "test": 
+            episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out 
+        else: 
+            episode_failed = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | time_out | out_of_bounds_min_puck_velx
 
         done_info = {}
         done_info = {

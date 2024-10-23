@@ -260,6 +260,11 @@ def main():
         config={},
     )
 
+    # Test mode
+    # test_mode = "taskonly"
+    # # test_mode = "exptask"
+    test_mode = env.test_mode
+
     # reset environment
     obs, infos = env.reset()
     prev_total_episode_num = 0
@@ -309,8 +314,9 @@ def main():
                 # print(task_phase)
                 # print("Current timestep")
                 # print(env.episode_length_buf.shape)
-                # curr_task_phase = torch.ones(env.num_envs, dtype=torch.bool).to(env.device)
-                # curr_task_phase = env.episode_length_buf > 5
+                if test_mode == "taskonly": 
+                    # curr_task_phase = torch.ones(env.num_envs, dtype=torch.bool).to(env.device)
+                    curr_task_phase = env.episode_length_buf > 5
                 # print(infos["prop_estimation"]["curr_rmse"])
                 # print(obs)
                 # print(curr_task_phase)
@@ -320,7 +326,7 @@ def main():
             transition_to_task_idx = torch.nonzero(transition_to_task).squeeze().view(-1)
             env._get_transition_to_task_idx(transition_to_task_idx)
 
-            curr_prop_info = env._get_estimation()["denormalsied_output"]
+            curr_prop_info = env._get_estimation()["denormalsied_target"]
             # print("prop")
             # print(curr_task_phase)
             if curr_prop_info is not None: 
@@ -338,14 +344,15 @@ def main():
                 # Normalize the entire tensor (broadcasting works here)
                 normalised_expend_prop_info = normalize(expend_prop_info, dynamic_frictions_min, dynamic_frictions_max, state_norm_min, state_norm_max)
                 
-            # print("Check")
-            # print(curr_task_phase)
-            # print(obs[:,11])
+            # # print("Check")
+            # # print(curr_task_phase)
+            # # print(obs[:,11])
             obs_task = obs
-            if normalised_expend_prop_info is not None: 
-                obs_task[curr_task_phase, 11] = normalised_expend_prop_info[curr_task_phase, 0]
+            if test_mode != "taskonly": 
+                if normalised_expend_prop_info is not None: 
+                    obs_task[curr_task_phase, 11] = normalised_expend_prop_info[curr_task_phase, 0]
 
-            # print(obs_task[:,11])
+            # # print(obs_task[:,11])
 
             # Compute action
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
@@ -356,6 +363,8 @@ def main():
             obs_exp = obs[:, :exp_observation_space]
             actions_exp, log_prob_exp, outputs_exp, prop_estimator_output_exp = exp_agent.act(obs_exp, infos, timestep=0, timesteps=0)
             actions_exp = outputs_exp["mean_actions"]
+            if test_mode == "taskonly": 
+                actions_exp = torch.zeros_like(actions_exp)
 
             final_actions = torch.where(curr_task_phase.unsqueeze(1), actions_task, actions_exp)
             # final_actions = torch.where(task_phase.unsqueeze(1), actions_task, actions_rest)
@@ -457,7 +466,7 @@ def main():
                 # wandb.log({"Episode_num": total_episode_num})  
                 # wandb.log({"success_rate": success_rate_1env}) 
 
-                print(curr_task_change)
+                # print(curr_task_change)
                 if curr_task_change: 
                     task_change_num+=1
                 else: 
@@ -467,8 +476,8 @@ def main():
                 # print(task_change_num)
                 # print(task_change_rate)
                 curr_task_change = False
-                print("Exp failed num")
-                print(exp_failed_num)
+                # print("Exp failed num")
+                # print(exp_failed_num)
 
                 if "log" in infos and "end_rmse" in infos["log"]:
                     end_rmse = infos["log"]["end_rmse"]

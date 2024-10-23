@@ -1,0 +1,3 @@
+
+train_model: "test"
+test_mode: "exponly" # "exponly" # "exptask" # "taskonly"
