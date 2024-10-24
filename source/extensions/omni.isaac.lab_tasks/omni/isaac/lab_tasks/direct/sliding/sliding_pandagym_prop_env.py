@@ -295,6 +295,8 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     max_puck_goalcount = 10
     max_estimation_goalcount = 5
 
+    goal_length_push = 0.05
+
     # markergoal1_cfg = VisualizationMarkersCfg(
     #     prim_path="/Visual/Goal1",
     #     markers={
@@ -347,7 +349,7 @@ class SlidingPandaGymPropEnvCfg(DirectRLEnvCfg):
     episode_length_s = 3.0
     action_scale = 1.0
     num_actions = 2 # action dim
-    num_observations = 11
+    num_observations = 10
     num_states = 2
 
     max_puck_posx = 2.0  # the cart is reset if it exceeds that position [m]
@@ -407,11 +409,14 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         # Out of bound counter: goal puck (puck in goal)
         self.out_of_bounds_goal_puck_posx_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
+        self.out_of_bounds_goal_pushing_puck_pos_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
         self.out_of_bounds_goal_prop_estimate_count = torch.zeros((self.scene.env_origins.shape[0]), device=self.scene.env_origins.device)
 
         # Recent episode success/failure tracking (1: success, 0: failure)
         self.goal_bounds = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
         # self.inside_goal = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
+
+        self.goal_bounds_pushing = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
 
         self.goal_bounds_exp = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
         self.task_phase = torch.zeros((self.scene.env_origins.shape[0]), dtype=torch.bool)
@@ -448,7 +453,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.discrete_goal = False
 
         # Goal randomisation range for exploratory pushing
-        if self.train_model=="train" and self.test_mode=="exponly": 
+        if self.test_mode=="exponly": 
             self.goal_location_min_x = 1.2 # 1.05 # 1.15 #0.0
             self.goal_location_max_x = 1.4 # 1.55 # 1.55 #0.75
             self.goal_location_min_y = -0.1 # -0.3 # -0.2 #-0.3
@@ -590,19 +595,21 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         cfg_ground = sim_utils.GroundPlaneCfg()
         cfg_ground.func("/World/defaultGroundPlane", cfg_ground)
 
-        if self.train_model=="train" and self.test_mode=="exponly": 
+        markergoal1_cfg = self.cfg.markergoal1_cfg
+        if self.test_mode=="exponly": 
             markergoal1_cfg = VisualizationMarkersCfg(
                 prim_path="/Visual/Start1",
                 markers={
                     "cube": sim_utils.CuboidCfg(
-                        size=(goal_length*2, goal_length*2, 0.01),
+                        size=(self.cfg.goal_length_push*2, self.cfg.goal_length_push*2, 0.01),
                         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
                     ),
                 },
             )
 
         self.markerstart1 = VisualizationMarkers(cfg=self.cfg.markerstart1_cfg)
-        self.markergoal1 = VisualizationMarkers(cfg=self.cfg.markergoal1_cfg) 
+        # self.markergoal1 = VisualizationMarkers(cfg=self.cfg.markergoal1_cfg) 
+        self.markergoal1 = VisualizationMarkers(cfg=markergoal1_cfg) 
 
         self.cylinderpuck2 = RigidObject(self.cfg.cylinderpuck2_cfg)
         self.cuboidpusher2 = RigidObject(self.cfg.cuboidpusher2_cfg)
@@ -964,7 +971,8 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, denormalsied_estimated_prop), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_estimated_prop_rl), dim=1)
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)   
-        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)   
+        obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)   
+        # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)   
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y), dim=1)   
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, curr_cylinderpuck2_state[:, 6].view(-1,1), normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions), dim=1)        
         # obs = torch.cat((normalized_past_puck_pos_obs_x, normalized_past_puck_pos_obs_y, normalized_past_puck_rot_obs_yaw, normalized_past_puck_vel_obs_x, normalized_past_puck_vel_obs_y, normalized_past_pusher_pos_obs_x, normalized_past_pusher_pos_obs_y, normalized_past_pusher_vel_obs_x, normalized_past_pusher_vel_obs_y, normalized_goal_tensor_x, normalized_goal_tensor_y, normalized_dynamic_frictions, normalized_past_puckpusher_relative_obs, normalized_past_puckgoal_relative_obs), dim=1)        
@@ -1085,6 +1093,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
             self.goal_bounds, 
             normalized_goal_tensor, 
             self.prop_rmse_eachenv, 
+            self.goal_bounds_pushing, 
             self.goal_bounds_exp, 
             self.test_mode
         )
@@ -1118,7 +1127,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
             curr_cylinderpuck2_state[:, 0:3] - self.scene.env_origins
         )        
 
-        if self.train_model=="train" and self.test_mode=="exponly": 
+        if self.test_mode=="exponly": 
             out_of_bounds_max_puck_posx = curr_cylinderpuck2_state[:,0] > self.cfg.max_pusher_posx
             out_of_bounds_min_puck_posx = curr_cylinderpuck2_state[:,0] < self.cfg.min_pusher_posx
 
@@ -1175,6 +1184,21 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         #     else:
         #         self.curriculum_count+=1
 
+        if self.train_model=="train" and self.test_mode=="exponly": 
+            curr_success_rate = self.extras.get('log')
+            if curr_success_rate is not None: 
+                # print(curr_success_rate["success_rate"])  
+                if curr_success_rate["success_rate"] > 0.5 and self.rew_scale_goal_pushing > 0.02 and self.curriculum_count>self.max_episode_length: 
+                    self.rew_scale_goal_pushing -= 1.0
+                    print(self.rew_scale_goal_pushing)
+                    # self.rew_scale_goal += 5
+                    # self.success_threshold += 0.1
+                    # self.goal_length -= 0.1 
+                    self.curriculum_count = 0
+                    # pass
+                else:
+                    self.curriculum_count+=1
+
         # curr_out_of_bounds_goal_puck_posx_count = euclid_distance < 0.15
         curr_out_of_bounds_goal_puck_posx_count = euclid_distance < self.goal_threshold
         # print(curr_out_of_bounds_goal_puck_posx_count)
@@ -1190,6 +1214,15 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
         self.goal_bounds = self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount
         self.out_of_bounds_goal_puck_posx_count[self.out_of_bounds_goal_puck_posx_count>self.cfg.max_puck_goalcount] = 0
         self.out_of_bounds_goal_puck_posx_count[~curr_out_of_bounds_goal_puck_posx_count] = 0
+
+        # Goal for pushing
+        curr_out_of_bounds_goal_pushing_puck_pos_count = euclid_distance < self.cfg.goal_length_push
+
+        self.out_of_bounds_goal_pushing_puck_pos_count+= curr_out_of_bounds_goal_pushing_puck_pos_count.int()
+
+        self.goal_bounds_pushing = self.out_of_bounds_goal_pushing_puck_pos_count>self.cfg.max_puck_goalcount
+        self.out_of_bounds_goal_pushing_puck_pos_count[self.out_of_bounds_goal_pushing_puck_pos_count>self.cfg.max_puck_goalcount] = 0
+        self.out_of_bounds_goal_pushing_puck_pos_count[~curr_out_of_bounds_goal_pushing_puck_pos_count] = 0
         
         # Goal for exploration
         curr_out_of_bounds_goal_prop_estimate_count = self.prop_rmse_eachenv < self.prop_estimate_threshold
@@ -1206,6 +1239,7 @@ class SlidingPandaGymPropEnv(DirectRLEnvFeedback):
 
         if self.test_mode == "exponly": 
             self.goal_bounds = self.goal_bounds_exp
+            # self.goal_bounds = self.goal_bounds
 
         # out_of_bounds = out_of_bounds_max_pusher_posx | out_of_bounds_min_pusher_posx | out_of_bounds_max_puck_posx | out_of_bounds_min_puck_posx | overshoot_max_puck_posx | self.goal_bounds | out_of_bounds_min_puck_velx     
         # out_of_bounds = out_of_bounds_max_pusher_pos | out_of_bounds_min_pusher_pos | out_of_bounds_max_puck_pos | out_of_bounds_min_puck_pos | self.goal_bounds | out_of_bounds_min_puck_velx     
@@ -1456,6 +1490,7 @@ def compute_rewards(
     goal_bounds: torch.Tensor, 
     goal_locations: torch.Tensor, 
     prop_rmse_eachenv: torch.Tensor, 
+    goal_bounds_pushing: torch.Tensor, 
     goal_bounds_exp: torch.Tensor, 
     test_mode: str, 
 ):
@@ -1492,11 +1527,13 @@ def compute_rewards(
     rew_prop_estimate = rew_scale_props_estimate * prop_rmse_eachenv.float()
 
     # Reward for exploration
-    rew_goal_pushing = rew_scale_goal_pushing * goal_bounds.int() 
+    rew_goal_pushing = rew_scale_goal_pushing * goal_bounds_pushing.int() 
     rew_goal_exp = rew_scale_goal_exp * goal_bounds_exp.int() 
     
     if test_mode=="exponly": 
-        total_reward = rew_goal_pushing + rew_goal_exp + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+        total_reward = rew_goal_exp + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+        # total_reward = rew_goal_pushing + rew_goal_exp + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
+        # total_reward = rew_goal_pushing + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
     else: 
         total_reward = rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep
     # total_reward = rew_prop_estimate + rew_goal + rew_termination # + rew_distance # + rew_pushervel0 # + rew_pushervel0 # + rew_timestep

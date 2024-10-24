@@ -107,11 +107,24 @@ prop_estimator:
   num_layers: 1      # Number of LSTM layers
   output_size: 1     # Number of physical properties (e.g., friction, CoM)
   learning_rate: 0.001
-  pre_trained: False
-  pre_trained_path: "/workspace/isaaclab/logs/skrl/exploration_direct/2024-10-17_18-31-10/checkpoints_prop/LSTM_best.pth"
-  freeze_weights: False
   num_epochs: 5
   policy_switch: False
+  # # First iteration
+  # pre_trained: False
+  # freeze_weights: False
+  # # First iteration (eval)
+  # pre_trained: True
+  # pre_trained_path: "/workspace/isaaclab/logs/skrl/sliding_direct/2024-10-24_13-53-17/checkpoints_prop/LSTM_best.pth"
+  # freeze_weights: True
+  # Second iteration 
+  # pre_trained: True
+  # pre_trained_path: "/workspace/isaaclab/logs/skrl/sliding_direct/2024-10-24_13-53-17/checkpoints_prop/LSTM_best.pth"
+  # freeze_weights: False
+  # Second iteration (eval)
+  pre_trained: True
+  # pre_trained_path: "/workspace/isaaclab/logs/skrl/sliding_direct/2024-10-24_14-26-19/checkpoints_prop/LSTM_best.pth"
+  pre_trained_path: "/workspace/isaaclab/logs/skrl/sliding_direct/2024-10-24_14-50-09/checkpoints_prop/LSTM_best.pth"
+  freeze_weights: True
 
   position_index: [0,1,3,4]
   rotation_index: 2

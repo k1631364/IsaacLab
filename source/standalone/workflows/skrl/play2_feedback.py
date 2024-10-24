@@ -201,6 +201,7 @@ def main():
             # agent stepping
             # actions = agent.act(obs, timestep=0, timesteps=0)[0]
             actions, log_prob, outputs, prop_estimator_output = agent.act(obs, infos, timestep=0, timesteps=0)
+            actions = outputs["mean_actions"]
             
             # get prop estimate
             prop_info = {}
@@ -210,8 +211,8 @@ def main():
             env._set_estimation(prop_info)
 
             if "prop_estimation" in infos: 
-                # print("curr rmse")
-                # print(infos["prop_estimation"])
+                print("curr rmse")
+                print(infos["prop_estimation"])
                 # print("Passed info")
                 # print(prop_estimator_output)
                 pass
